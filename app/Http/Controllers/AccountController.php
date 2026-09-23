@@ -940,25 +940,100 @@ public function carrier_search(Request $request)
     }
 
 
-    public function mc_check(Request $request){
+public function mc_check(Request $request)
+{
+    $load = External::find($request->carrier_id);
 
-        $load = External::find($request->carrier_id);
-
-        if ($load) {
-
-            $subject = 'Changed the carrier MC "' . $load->carrier_mc_ff_input .
-           '" check status from "' . $load->mc_check .
-           '" to "' . $request->mc_check . '"';
-            addToLog($customerId ='', $loadId ='', $subject, $oldData ='', $newData ='');
-
-            $load->mc_check = $request->mc_check ?? 'Not Approved';
-            $load->save();
-
-            return response()->json(['success' => true, 'message' => 'MC checks updated successfully.']);
-        } else {
-            return response()->json(['success' => false, 'message' => 'MC not found.'], 404);
-        }
+    if (!$load) {
+        return response()->json([
+            'success' => false,
+            'message' => 'MC not found.'
+        ], 404);
     }
+
+    $oldStatus = $load->mc_check;
+    $newStatus = $request->mc_check ?? 'Not Approved';
+
+    if ($newStatus === 'Approved as Exception') {
+
+        $note = trim($request->compliance_exception_note ?? '');
+
+        if ($note === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter an exception note.'
+            ], 422);
+        }
+
+        $username = Auth::user()->name;
+
+        /*
+         * Remove existing username prefix
+         * before adding current username.
+         */
+        $note = preg_replace(
+            '/^[^:]+:\s*/',
+            '',
+            $note
+        );
+
+        $load->compliance_exception_note =
+            $username . ' : ' . $note;
+
+    } else {
+
+        $load->compliance_exception_note = null;
+        // $load->mc_check_date = null;
+    }
+
+if ($oldStatus !== $newStatus) {
+
+    $carrierName = $load->company_name
+        ?? $load->carrier_name
+        ?? 'N/A';
+
+    $mcNumber = $load->carrier_mc_ff_input ?? 'N/A';
+
+    $subject =
+        'Changed Carrier MC Compliance Status | ' .
+        'Carrier: "' . $carrierName . '" | ' .
+        'MC Number: "' . $mcNumber . '" | ' .
+        'Status: "' . ($oldStatus ?: 'Not Set') . '" → "' . $newStatus . '"';
+
+    $newData =
+        'Carrier: ' . $carrierName . "\n" .
+        'MC Number: ' . $mcNumber . "\n" .
+        'Previous Status: ' . ($oldStatus ?: 'Not Set') . "\n" .
+        'New Status: ' . $newStatus;
+
+    if ($newStatus === 'Approved as Exception') {
+
+        $newData .= "\n" .
+            'Exception Note: ' .
+            ($load->compliance_exception_note ?? 'N/A');
+    }
+
+    addToLog(
+        '',
+        '',
+        $subject,
+        '',
+        $newData
+    );
+
+    }
+
+    $load->mc_check = $newStatus;
+
+    $load->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'MC checks updated successfully.',
+        'exception_note' =>
+            $load->compliance_exception_note
+    ]);
+}
 	
 	public function mc_setup(Request $request){
 
@@ -3883,8 +3958,8 @@ public function deleteCarrierFile(Request $request)
         // Initialize the required data based on the $id
         if ($id == 'Mc') {
             $data = External::orderBy('id', 'DESC')->get();
-            $headers = ['Sr.no', 'MC NO', 'DOT', 'Carrier Name', 'Agent', 'Date Added', 'MC Status','Setup Status'];
-            $columns = ['carrier_mc_ff_input', 'carrier_dot', 'carrier_name', 'user.name', 'created_at', 'mc_check','setup'];
+            $headers = ['Sr.no', 'MC NO', 'DOT', 'Carrier Name', 'Agent', 'Date Added', 'MC Status','Setup Status', 'Exception Note'];
+            $columns = ['carrier_mc_ff_input', 'carrier_dot', 'carrier_name', 'user.name', 'created_at', 'mc_check','setup', 'compliance_exception_note'];
     
         } elseif ($id == 'Cpr') {
             $data = Load::with('user')->orderByRaw('CAST(load_number AS UNSIGNED) DESC')->get();
