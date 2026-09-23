@@ -79,7 +79,9 @@
             <option value="Verified" data-load-id="{{ $delivered->id }}" {{ $delivered->cpr_check == 'Verified' ? 'selected' : '' }}>Verified</option>
             <option value="Not Verified" data-load-id="{{ $delivered->id }}" {{ $delivered->cpr_check == 'Not Verified' ? 'selected' : '' }}>Not Verified</option>
             <option value="Not Received" data-load-id="{{ $delivered->id }}" {{ $delivered->cpr_check == 'Not Received' ? 'selected' : '' }}>Not Received</option>
+            <option value="Approved as Exception" data-load-id="{{ $delivered->id }}" {{ $delivered->cpr_check == 'Approved as Exception' ? 'selected' : '' }}>Approved as Exception</option>
         </select>
+        <textarea name="cpr_exception_note" data-load-id="{{ $delivered->id }}" class="form-control cpr-exception-note mt-2" rows="2" placeholder="Enter exception note" style="{{ $delivered->cpr_check == 'Approved as Exception' ? '' : 'display: none;' }}">{{ $delivered->cpr_exception_note ?? '' }}</textarea>
     </td>
 @elseif($delivered->customer?->pre_payment == 1)
     <td>
@@ -213,40 +215,222 @@
 <script>
 
 function changecpr(selectElement) {
-    var $selectedOption = $(selectElement).find('option:selected');
-    var load_id = $selectedOption.data('load-id');
-    var cpr_check = $(selectElement).val();
 
+    var $select = $(selectElement);
+
+    var $selectedOption = $select.find('option:selected');
+
+    var load_id = $selectedOption.data('load-id');
+
+    var cpr_check = $select.val();
+
+    var $exceptionNote = $select
+        .siblings('.cpr-exception-note');
+
+
+    /*
+     * Approved as Exception
+     * --------------------------------
+     * Just show textarea.
+     * DO NOT AJAX yet because user
+     * still needs to enter the note.
+     */
+    if (cpr_check === 'Approved as Exception') {
+
+        $exceptionNote.show().focus();
+
+        return;
+    }
+
+
+    /*
+     * For all other statuses,
+     * hide and clear exception note
+     */
+    $exceptionNote.hide();
+
+    $exceptionNote.val('');
+
+
+    /*
+     * Save CPR status
+     */
     $.ajax({
+
         url: '/account/cpr-check',
+
         method: 'POST',
+
         data: {
             load_id: load_id,
-            cpr_check: cpr_check
+            cpr_check: cpr_check,
+            cpr_exception_note: ''
         },
+
         headers: {
-            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            'X-CSRF-TOKEN':
+                $('meta[name="csrf-token"]').attr('content')
         },
+
         success: function (response) {
+
             console.log('Success:', response);
-            $('.cpr_status-' + load_id).text(cpr_check);
-            $('#mc-success-message').text(response.message).fadeIn();
+
+            $('.cpr_status-' + load_id)
+                .text(cpr_check);
+
+            $('#mc-success-message')
+                .text(response.message)
+                .fadeIn();
 
             setTimeout(function () {
-                $('#mc-success-message').text('').fadeOut();
-            }, 1000); // 1 second
+
+                $('#mc-success-message')
+                    .text('')
+                    .fadeOut();
+
+            }, 1000);
         },
-        error: function (xhr, status, error) {
-            console.error('Error:', error);
-            $('#mc-error-message').text(error).fadeIn();
+
+        error: function (xhr) {
+
+            console.error('Error:', xhr);
+
+            var message =
+                xhr.responseJSON?.message ||
+                'Something went wrong.';
+
+            $('#mc-error-message')
+                .text(message)
+                .fadeIn();
 
             setTimeout(function () {
-                $('#mc-error-message').text('').fadeOut();
-            }, 1000); // 1 second
+
+                $('#mc-error-message')
+                    .text('')
+                    .fadeOut();
+
+            }, 2000);
         }
     });
 }
 
+
+/*
+ * Save exception note
+ */
+$(document).on(
+    'blur',
+    '.cpr-exception-note',
+    function () {
+
+        var $note = $(this);
+
+        var load_id = $note.data('load-id');
+
+        var note = $.trim($note.val());
+
+
+        /*
+         * Don't save empty note
+         */
+        if (note === '') {
+
+            $('#mc-error-message')
+                .text('Please enter an exception note.')
+                .fadeIn();
+
+            setTimeout(function () {
+
+                $('#mc-error-message')
+                    .text('')
+                    .fadeOut();
+
+            }, 2000);
+
+            return;
+        }
+
+
+        /*
+         * Save status + note together
+         */
+        $.ajax({
+
+            url: '/account/cpr-check',
+
+            method: 'POST',
+
+            data: {
+
+                load_id: load_id,
+
+                cpr_check: 'Approved as Exception',
+
+                cpr_exception_note: note
+            },
+
+            headers: {
+
+                'X-CSRF-TOKEN':
+                    $('meta[name="csrf-token"]').attr('content')
+            },
+
+            success: function (response) {
+
+                console.log(
+                    'CPR Exception saved:',
+                    response
+                );
+
+
+                $('.cpr_status-' + load_id)
+                    .text('Approved as Exception');
+
+
+                $('#mc-success-message')
+                    .text(response.message)
+                    .fadeIn();
+
+
+                setTimeout(function () {
+
+                    $('#mc-success-message')
+                        .text('')
+                        .fadeOut();
+
+                }, 1000);
+            },
+
+            error: function (xhr) {
+
+                console.error(
+                    'Exception note error:',
+                    xhr
+                );
+
+
+                var message =
+                    xhr.responseJSON?.message ||
+                    'Something went wrong.';
+
+
+                $('#mc-error-message')
+                    .text(message)
+                    .fadeIn();
+
+
+                setTimeout(function () {
+
+                    $('#mc-error-message')
+                        .text('')
+                        .fadeOut();
+
+                }, 2000);
+            }
+        });
+    }
+);
  $(document).ready(function() {
 
     $(document).on('change', 'select[id^="rate_check-"]', function(e){
