@@ -39,6 +39,7 @@ jobs:
           username: ${{ secrets.STAGING_USERNAME || secrets.SSH_USER }}
           port: 65002
           key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.STAGING_SSH_PASSPHRASE || secrets.SSH_KEY_PASSPHRASE }}
           timeout: 60s
           command_timeout: 30m
           debug: true
