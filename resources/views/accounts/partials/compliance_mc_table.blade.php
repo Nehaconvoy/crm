@@ -6,12 +6,41 @@
     <td>{{$carrier->carrier_name}}</td>
     <td>{{$carrier->user?->name}}</td>
     <td>{{$carrier->created_at}}</td>
-     <td>
-        <select name="mc_check" onchange="mc_check(this)" id="mc_check-{{ $carrier->id }}" class="form-control compliance-select" width="100%">
-            <option value="" data-carrier-id="{{ $carrier->id }}">Please Select MC</option>
-            <option value="Approved"  data-carrier-id="{{ $carrier->id }}" {{ $carrier->mc_check == 'Approved' ? 'selected' : '' }}>Approved</option>
-            <option value="Not Approved"  data-carrier-id="{{ $carrier->id }}" {{ $carrier->mc_check == 'Not Approved' ? 'selected' : '' }}>Not Approved</option>
+    <td>
+        <select
+            name="mc_check"
+            onchange="mc_check(this)"
+            id="mc_check-{{ $carrier->id }}"
+            class="form-control compliance-select"
+            style="width:100%;"
+        >
+            <option value="">Please Select MC</option>
+
+            <option value="Approved"
+                {{ $carrier->mc_check == 'Approved' ? 'selected' : '' }}>
+                Approved
+            </option>
+
+            <option value="Approved as Exception"
+                {{ $carrier->mc_check == 'Approved as Exception' ? 'selected' : '' }}>
+                Approved as Exception
+            </option>
+
+            <option value="Not Approved"
+                {{ $carrier->mc_check == 'Not Approved' ? 'selected' : '' }}>
+                Not Approved
+            </option>
         </select>
+
+        <textarea
+            id="compliance-exception-note-{{ $carrier->id }}"
+            class="form-control mt-2 compliance-exception-note"
+            placeholder="Enter exception note"
+            {{ !empty($carrier->compliance_exception_note) ? 'disabled' : '' }}
+            style="
+                display: {{ $carrier->mc_check == 'Approved as Exception' ? 'block' : 'none' }};
+            "
+        >{{ $carrier->compliance_exception_note ?? '' }}</textarea>
     </td>
 	<td>
         <select id="mc_setup-{{ $carrier->id }}" onchange="mc_setup(this)" name="setup" class="form-control compliance-select" >
@@ -146,40 +175,193 @@
 
 <script>
 function mc_check(e) {
-    var $selectedOption = $(e).find('option:selected');
-    var carrier_id = $selectedOption.data('carrier-id');
+
+    var carrier_id = $(e).attr('id').replace('mc_check-', '');
     var mc_check = $(e).val();
 
+    var $exceptionNote = $('#compliance-exception-note-' + carrier_id);
+
+    if (mc_check === 'Approved as Exception') {
+
+        $exceptionNote.show();
+
+        // If note already exists, keep it disabled
+        if ($.trim($exceptionNote.val())) {
+            $exceptionNote.prop('disabled', true);
+        } else {
+            // New exception - allow user to enter note
+            $exceptionNote.prop('disabled', false);
+            $exceptionNote.focus();
+        }
+
+    } else {
+
+        // Any other MC status
+        $exceptionNote
+            .hide()
+            .prop('disabled', true);
+    }
+
+    // Don't save exception status until note is entered
+    if (mc_check === 'Approved as Exception') {
+
+        if (!$.trim($exceptionNote.val())) {
+            return;
+        }
+    }
+
+    saveMcCheck(
+        carrier_id,
+        mc_check,
+        $exceptionNote.val()
+    );
+}
+
+
+function saveMcCheck(carrier_id, mc_check, exception_note) {
+
     $.ajax({
-        url: '/account/mc-chcek', // Fixed the typo here
+        url: '/account/mc-chcek',
         method: 'POST',
+
         data: {
             carrier_id: carrier_id,
-            mc_check: mc_check
+            mc_check: mc_check,
+            compliance_exception_note: exception_note
         },
+
         headers: {
             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
         },
-        success: function (response) {
+
+        success: function(response) {
+
             console.log('Success:', response);
-            $('.status-' + carrier_id).text(mc_check);
-            $('#mc-success-message').text(response.message).fadeIn();
 
-            setTimeout(function () {
-                $('#mc-success-message').text('').fadeOut();
-            }, 10000); // 10 seconds
+            var $exceptionNote =
+                $('#compliance-exception-note-' + carrier_id);
+
+            /*
+             * Update textarea with saved value
+             */
+            if (response.exception_note !== undefined) {
+
+                $exceptionNote.val(response.exception_note);
+            }
+
+            /*
+             * Once note is successfully saved,
+             * disable the textarea.
+             */
+            if (
+                mc_check === 'Approved as Exception' &&
+                $.trim($exceptionNote.val())
+            ) {
+
+                $exceptionNote
+                    .prop('disabled', true)
+                    .show();
+            }
+
+            /*
+             * If MC is changed from Exception
+             */
+            if (mc_check !== 'Approved as Exception') {
+
+                $exceptionNote
+                    .hide()
+                    .prop('disabled', true);
+            }
+
+            $('#mc-success-message')
+                .text(response.message)
+                .fadeIn();
+
+            setTimeout(function() {
+
+                $('#mc-success-message')
+                    .text('')
+                    .fadeOut();
+
+            }, 5000);
         },
-        error: function (xhr, status, error) {
-            console.error('Error:', error);
-            $('#mc-error-message').text(error).fadeIn();
 
-            setTimeout(function () {
-                $('#mc-error-message').text('').fadeOut();
-            }, 10000); // 10 seconds
+        error: function(xhr) {
+
+            console.error('Error:', xhr);
+
+            var message = 'Something went wrong.';
+
+            if (xhr.responseJSON &&
+                xhr.responseJSON.message) {
+
+                message = xhr.responseJSON.message;
+            }
+
+            $('#mc-error-message')
+                .text(message)
+                .fadeIn();
+
+            setTimeout(function() {
+
+                $('#mc-error-message')
+                    .text('')
+                    .fadeOut();
+
+            }, 5000);
         }
     });
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Save note when user leaves textarea
+|--------------------------------------------------------------------------
+*/
+
+$(document).on(
+    'blur',
+    '.compliance-exception-note',
+    function() {
+
+        var $this = $(this);
+
+        /*
+         * Don't do anything if textarea is disabled
+         */
+        if ($this.prop('disabled')) {
+            return;
+        }
+
+        var carrier_id = this.id.replace(
+            'compliance-exception-note-',
+            ''
+        );
+
+        var mc_check =
+            $('#mc_check-' + carrier_id).val();
+
+        if (mc_check !== 'Approved as Exception') {
+            return;
+        }
+
+        var note = $.trim($this.val());
+
+        if (!note) {
+
+            $this.focus();
+
+            return;
+        }
+
+        saveMcCheck(
+            carrier_id,
+            mc_check,
+            note
+        );
+    }
+);
 
 function mc_setup(e) {
     var $selectedOption = $(e).find('option:selected');
