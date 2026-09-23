@@ -63,7 +63,7 @@
         
         <td>
             
-            <select name="rate_check" id="rate_check-{{ $delivered->id }}" data-load-id="{{ $delivered->id }}" class="form-control rate_check">
+            <select name="rate_check" id="rate_check-{{ $delivered->id }}" data-load-id="{{ $delivered->id }}" class="form-control rate_check cpr-native-select no-select2">
                 <option value="">Please Select Rate Check</option>
                 <option value="1" {{ $delivered->rate_check == '1' ? 'selected' : '' }}>Checked</option>
                 <option value="0" {{ $delivered->rate_check == '0' ? 'selected' : '' }}>Not Checked</option>
@@ -74,7 +74,7 @@
         </td>
 @if($delivered->customer?->pre_payment == 0 || $delivered->customer?->pre_payment == null)
     <td>
-        <select name="cpr_check" onchange="changecpr(this)" class="form-control">
+        <select name="cpr_check" onchange="changecpr(this)" class="form-control cpr-native-select no-select2">
             <option value="">Select CPR</option>
             <option value="Verified" data-load-id="{{ $delivered->id }}" {{ $delivered->cpr_check == 'Verified' ? 'selected' : '' }}>Verified</option>
             <option value="Not Verified" data-load-id="{{ $delivered->id }}" {{ $delivered->cpr_check == 'Not Verified' ? 'selected' : '' }}>Not Verified</option>
@@ -94,14 +94,14 @@
             @endif
         </td>
         <td >
-            <select name="macro" onchange="macro(this)" class="form-control" id="macro-{{ $delivered->id }}" >
+            <select name="macro" onchange="macro(this)" class="form-control cpr-native-select no-select2" id="macro-{{ $delivered->id }}" >
                 <option value="">Select Macro</option>
                 <option value="Sent" data-load-id="{{ $delivered->id }}" {{ $delivered->macro == 'Sent' ? 'selected' : '' }}>Sent</option>
                 <option value="Not Sent" data-load-id="{{ $delivered->id }}" {{ $delivered->macro == 'Not Sent' ? 'selected' : '' }}>Not Sent</option>
             </select>
         </td>
         <td >
-            <select name="no_of_macro" onchange="no_of_macro(this)" class="form-control" id="no_of_macro-{{ $delivered->id }}">
+            <select name="no_of_macro" onchange="no_of_macro(this)" class="form-control cpr-native-select no-select2" id="no_of_macro-{{ $delivered->id }}">
                 <option value="">Select No Of Macro</option>
                 @for ($i = 0; $i <= 10; $i++)
                     <option value="{{ $i }}" data-load-id="{{ $delivered->id }}" {{ $delivered->no_of_macro == $i ? 'selected' : '' }}>{{ $i }}</option>
@@ -138,12 +138,12 @@
         </td>
         
 		
-		<div class="modal fade" id="view-documents-{{ $delivered->id }}" tabindex="-1" aria-labelledby="view-documents" aria-hidden="true">
-        <div class="modal-dialog modal-lg" style="max-width: 800px;">
+		<div class="modal fade cpr-documents-modal" id="view-documents-{{ $delivered->id }}" tabindex="-1" aria-labelledby="view-documents-{{ $delivered->id }}-title" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <!-- Modal Header -->
                     <div class="modal-header" style="padding-left: 14px;">
-                    <h4 class="modal-title">View Documents</h4>
+                    <h4 class="modal-title" id="view-documents-{{ $delivered->id }}-title">View Documents</h4>
                     <button type="button" class="close" data-bs-dismiss="modal">&times;</button>
                     </div>
 
@@ -160,16 +160,16 @@
                         <p>No documents found.</p>
                     @else
 
-                        <div class="accordion" id="accordionExample">
+                        <div class="accordion" id="cpr-documents-accordion-{{ $delivered->id }}">
                             @foreach($docs as $key => $all)
                             
                             <div class="accordion-item">
-                                <h2 class="accordion-header" id="headingOne">
-                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{$key}}" aria-expanded="false" aria-controls="collapse{{$key}}">
+                                <h2 class="accordion-header" id="cpr-documents-heading-{{ $delivered->id }}-{{ $key }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cpr-documents-collapse-{{ $delivered->id }}-{{ $key }}" aria-expanded="false" aria-controls="cpr-documents-collapse-{{ $delivered->id }}-{{ $key }}">
                                     view document #{{$key + 1}}
                                     </button>
                                 </h2>
-                                <div id="collapse{{$key}}" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
+                                <div id="cpr-documents-collapse-{{ $delivered->id }}-{{ $key }}" class="accordion-collapse collapse" aria-labelledby="cpr-documents-heading-{{ $delivered->id }}-{{ $key }}" data-bs-parent="#cpr-documents-accordion-{{ $delivered->id }}">
                                     <div class="accordion-body">
                                        @php
                                             $file = $all; // Or $all['file'] depending on your data structure

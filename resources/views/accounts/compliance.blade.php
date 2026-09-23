@@ -79,8 +79,91 @@ select#rate_check-21291 {
     line-height: normal;
 }
 
+#datatable-buttons-cpr .compliance-select + .select2-container {
+    width: 150px !important;
+    min-width: 150px;
+}
+
+#datatable-buttons-cpr .select2-results__options {
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+#datatable-buttons-cpr .select2-results__option {
+    min-height: 30px;
+    padding: 6px 8px;
+    white-space: nowrap;
+}
+
+.select2-container--open {
+    z-index: 10000 !important;
+}
+
+.select2-container--open .select2-dropdown {
+    z-index: 10001 !important;
+    min-width: 150px;
+}
+
+.select2-container--open .select2-results__options {
+    max-height: 180px !important;
+    overflow-y: auto !important;
+}
+
+.select2-container--open .select2-results__option {
+    min-height: 30px;
+    padding: 6px 8px;
+    white-space: nowrap;
+}
+
 .select2-container--open .select2-dropdown--below {
     top: 4px !important;
+}
+
+.cpr-documents-modal .modal-dialog {
+    width: min(800px, calc(100vw - 2rem));
+    max-width: 800px;
+}
+
+.cpr-documents-modal .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.cpr-documents-modal .accordion-button {
+    min-height: 42px;
+    white-space: normal;
+    text-align: left;
+}
+
+.cpr-documents-modal .accordion-body {
+    max-height: 55vh;
+    overflow: auto;
+}
+
+#datatable-buttons-cpr select.cpr-native-select {
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
+    height: 32px;
+    min-height: 32px;
+    padding: 4px 24px 4px 8px;
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#datatable-buttons-cpr td {
+    vertical-align: middle;
+}
+
+#datatable-buttons-cpr select.cpr-native-select {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    background-image: none !important;
+    background-position: initial;
+    background-repeat: initial;
 }
 </style>
 
@@ -259,6 +342,35 @@ select#rate_check-21291 {
                 <!-- End Page-content -->
 
 <script>
+function initCprSelect2(scope) {
+    if (typeof $.fn.select2 !== 'function') {
+        return;
+    }
+
+    var $scope = scope ? $(scope) : $('#compliance-cpr-search');
+    $scope.find('select.compliance-select').each(function () {
+        var $select = $(this);
+        var $emptyOption = $select.find('option[value=""]').first();
+        var placeholder = $emptyOption.text().trim() || 'Select';
+
+        if ($select.hasClass('select2-hidden-accessible')) {
+            $select.select2('destroy');
+        }
+
+        $select.select2({
+            width: '150px',
+            dropdownParent: $('body'),
+            minimumResultsForSearch: Infinity,
+            placeholder: placeholder,
+            allowClear: $emptyOption.length > 0
+        });
+    });
+}
+
+$(document).ready(function () {
+    initCprSelect2();
+});
+
    $(document).on('click', '.custom-pagination a', function(e) {
     e.preventDefault();
 
@@ -299,7 +411,9 @@ select#rate_check-21291 {
             }
 
             $(resultContainer).html(data.html);
-            if (activeTab === '#mc' && typeof window.initSelect2 === 'function') {
+                            if (activeTab === '#cpr') {
+                                initCprSelect2(resultContainer);
+                            } else if (activeTab === '#mc' && typeof window.initSelect2 === 'function') {
                 window.initSelect2(resultContainer);
             }
             $(resultContainer).closest('.tab-pane').find('.custom-pagination')
@@ -369,7 +483,9 @@ $(document).ready(function () {
                                 $(tableSelector).DataTable().destroy();
                             }
                             $(resultContainer).html(response);
-                            if (target === '#mc' && typeof window.initSelect2 === 'function') {
+                            if (target === '#cpr') {
+                                initCprSelect2(resultContainer);
+                            } else if (target === '#mc' && typeof window.initSelect2 === 'function') {
                                 window.initSelect2(resultContainer);
                             }
                             $(tableSelector).DataTable({
@@ -406,6 +522,9 @@ $(document).ready(function () {
         const target = $(e.target).attr("href");
         //if (!initializedTabs[target]) {
             initializeTab(target);
+            if (target === '#cpr') {
+                initCprSelect2();
+            }
         //}
     });
 
