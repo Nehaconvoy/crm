@@ -140,6 +140,10 @@ select#rate_check-21291 {
     overflow: auto;
 }
 
+#datatable-buttons-cpr td {
+    vertical-align: middle;
+}
+
 #datatable-buttons-cpr select.cpr-native-select {
     width: 150px;
     min-width: 150px;
@@ -149,21 +153,9 @@ select#rate_check-21291 {
     padding: 4px 24px 4px 8px;
     font-size: 13px;
     line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#datatable-buttons-cpr td {
-    vertical-align: middle;
-}
-
-#datatable-buttons-cpr select.cpr-native-select {
     appearance: auto;
     -webkit-appearance: menulist;
     background-image: none !important;
-    background-position: initial;
-    background-repeat: initial;
 }
 </style>
 
