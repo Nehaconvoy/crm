@@ -236,8 +236,8 @@ select#rate_check-21291 {
 														<th>Setup</th>
                                                         <th>MC Status</th>
 														<th>Setup Status</th>
-                                                                <th>Upload Documents</th>
-                                                                <th>Uploaded Documents</th>
+                                                        <th>Upload Documents</th>
+                                                        <th>Uploaded Documents</th>
                                                         <th>Documents</th>
                                                         <th>Carrier Block</th>
                                                     </tr>

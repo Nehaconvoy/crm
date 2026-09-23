@@ -940,25 +940,100 @@ public function carrier_search(Request $request)
     }
 
 
-    public function mc_check(Request $request){
+public function mc_check(Request $request)
+{
+    $load = External::find($request->carrier_id);
 
-        $load = External::find($request->carrier_id);
-
-        if ($load) {
-
-            $subject = 'Changed the carrier MC "' . $load->carrier_mc_ff_input .
-           '" check status from "' . $load->mc_check .
-           '" to "' . $request->mc_check . '"';
-            addToLog($customerId ='', $loadId ='', $subject, $oldData ='', $newData ='');
-
-            $load->mc_check = $request->mc_check ?? 'Not Approved';
-            $load->save();
-
-            return response()->json(['success' => true, 'message' => 'MC checks updated successfully.']);
-        } else {
-            return response()->json(['success' => false, 'message' => 'MC not found.'], 404);
-        }
+    if (!$load) {
+        return response()->json([
+            'success' => false,
+            'message' => 'MC not found.'
+        ], 404);
     }
+
+    $oldStatus = $load->mc_check;
+    $newStatus = $request->mc_check ?? 'Not Approved';
+
+    if ($newStatus === 'Approved as Exception') {
+
+        $note = trim($request->compliance_exception_note ?? '');
+
+        if ($note === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter an exception note.'
+            ], 422);
+        }
+
+        $username = Auth::user()->name;
+
+        /*
+         * Remove existing username prefix
+         * before adding current username.
+         */
+        $note = preg_replace(
+            '/^[^:]+:\s*/',
+            '',
+            $note
+        );
+
+        $load->compliance_exception_note =
+            $username . ' : ' . $note;
+
+    } else {
+
+        $load->compliance_exception_note = null;
+        // $load->mc_check_date = null;
+    }
+
+if ($oldStatus !== $newStatus) {
+
+    $carrierName = $load->company_name
+        ?? $load->carrier_name
+        ?? 'N/A';
+
+    $mcNumber = $load->carrier_mc_ff_input ?? 'N/A';
+
+    $subject =
+        'Changed Carrier MC Compliance Status | ' .
+        'Carrier: "' . $carrierName . '" | ' .
+        'MC Number: "' . $mcNumber . '" | ' .
+        'Status: "' . ($oldStatus ?: 'Not Set') . '" → "' . $newStatus . '"';
+
+    $newData =
+        'Carrier: ' . $carrierName . "\n" .
+        'MC Number: ' . $mcNumber . "\n" .
+        'Previous Status: ' . ($oldStatus ?: 'Not Set') . "\n" .
+        'New Status: ' . $newStatus;
+
+    if ($newStatus === 'Approved as Exception') {
+
+        $newData .= "\n" .
+            'Exception Note: ' .
+            ($load->compliance_exception_note ?? 'N/A');
+    }
+
+    addToLog(
+        '',
+        '',
+        $subject,
+        '',
+        $newData
+    );
+
+    }
+
+    $load->mc_check = $newStatus;
+
+    $load->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'MC checks updated successfully.',
+        'exception_note' =>
+            $load->compliance_exception_note
+    ]);
+}
 	
 	public function mc_setup(Request $request){
 
@@ -979,22 +1054,131 @@ public function carrier_search(Request $request)
     }
 
 
-     public function cpr_check(Request $request){
+public function cpr_check(Request $request)
+{
+    $load = Load::find($request->load_id);
 
-        $load = Load::find($request->load_id);
-
-        if ($load) {
-
-            $subject = "Change the Load CP check status $load->cpr_check to $request->cpr_check";
-            addToLog($customerId = '', $request->load_id, $subject, $oldData ='', $newData ='');
-
-            $load->cpr_check = $request->cpr_check;
-            $load->save();
-            return response()->json(['success' => true, 'message' => 'CPR checks updated successfully.']);
-        } else {
-            return response()->json(['success' => false, 'message' => 'Load not found.'], 404);
-        }
+    if (!$load) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Load not found.'
+        ], 404);
     }
+
+    $oldStatus = $load->cpr_check;
+    $oldNote   = $load->cpr_exception_note;
+
+    $newStatus = $request->cpr_check;
+
+
+    /*
+     * Approved as Exception
+     */
+    if ($newStatus === 'Approved as Exception') {
+
+        $newNote = trim(
+            $request->cpr_exception_note ?? ''
+        );
+
+        if ($newNote === '') {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter an exception note.'
+            ], 422);
+        }
+
+    } else {
+
+        /*
+         * Clear exception note
+         */
+        $newNote = null;
+    }
+
+
+    /*
+     * Save
+     */
+    $load->cpr_check = $newStatus;
+
+    $load->cpr_exception_note = $newNote;
+
+    $load->save();
+
+
+    /*
+     * Log status change
+     */
+    if ($oldStatus !== $newStatus) {
+
+        $subject =
+            'Change the Load CPR status "' .
+            ($oldStatus ?: 'Not Set') .
+            '" to "' .
+            $newStatus .
+            '"';
+
+        $newData =
+            'Load ID: ' . $load->id . "\n" .
+            'Previous CPR Status: ' .
+            ($oldStatus ?: 'Not Set') . "\n" .
+            'New CPR Status: ' .
+            $newStatus;
+
+        if ($newStatus === 'Approved as Exception') {
+
+            $newData .=
+                "\nCPR Exception Note: " .
+                $newNote;
+        }
+
+        addToLog(
+            '',
+            $request->load_id,
+            $subject,
+            '',
+            $newData
+        );
+    }
+
+
+    /*
+     * Log note change
+     */
+    elseif (
+        $newStatus === 'Approved as Exception' &&
+        $oldNote !== $newNote
+    ) {
+
+        $subject =
+            'Updated Load CPR Exception Note';
+
+        $newData =
+            'Load ID: ' . $load->id . "\n" .
+            'CPR Status: ' . $newStatus . "\n" .
+            'Previous Note: ' .
+            ($oldNote ?: 'N/A') . "\n" .
+            'New Note: ' .
+            $newNote;
+
+        addToLog(
+            '',
+            $request->load_id,
+            $subject,
+            '',
+            $newData
+        );
+    }
+
+
+    return response()->json([
+        'success' => true,
+        'message' => 'CPR checks updated successfully.',
+        'cpr_check' => $load->cpr_check,
+        'cpr_exception_note' => $load->cpr_exception_note
+    ]);
+}
 
     public function macro(Request $request){
 
@@ -3883,8 +4067,8 @@ public function deleteCarrierFile(Request $request)
         // Initialize the required data based on the $id
         if ($id == 'Mc') {
             $data = External::orderBy('id', 'DESC')->get();
-            $headers = ['Sr.no', 'MC NO', 'DOT', 'Carrier Name', 'Agent', 'Date Added', 'MC Status','Setup Status'];
-            $columns = ['carrier_mc_ff_input', 'carrier_dot', 'carrier_name', 'user.name', 'created_at', 'mc_check','setup'];
+            $headers = ['Sr.no', 'MC NO', 'DOT', 'Carrier Name', 'Agent', 'Date Added', 'MC Status','Setup Status', 'Exception Note'];
+            $columns = ['carrier_mc_ff_input', 'carrier_dot', 'carrier_name', 'user.name', 'created_at', 'mc_check','setup', 'compliance_exception_note'];
     
         } elseif ($id == 'Cpr') {
             $data = Load::with('user')->orderByRaw('CAST(load_number AS UNSIGNED) DESC')->get();

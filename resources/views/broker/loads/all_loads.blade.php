@@ -387,15 +387,39 @@
                         style="margin:0 10px; font-size:20px;"></i>
                         Clone
                     </a>
-                    @if($loads->load_final_carrier_fee == 0 || $loads->load_final_carrier_fee == null)
-                    <a href="javascript:void(0);" style="color: #0c7ce6; cursor:not-allowed" title="Your Carrier Rate is 0">
-                        <i class="fas fa-file-pdf dynamic-data" style="margin:0 10px; font-size: 20px;"></i> Carrier RC
-                    </a>
-                    @else
-                    <a href="{{route('rc.download.pdf', $loads->load_number)}}" target="_blank">
-                        <i class="fas fa-file-pdf dynamic-data" style="margin:0 10px; font-size: 20px;"></i>Carrier RC
-                    </a>
-                    @endif
+@if(
+    ($loads->load_final_carrier_fee == 0 || $loads->load_final_carrier_fee == null) ||
+    !in_array($loads->cpr_check, ['Verified', 'Approved as Exception'])
+)
+
+    <a href="javascript:void(0);"
+       style="color:#0c7ce6; cursor:not-allowed;"
+       title="{{
+           ($loads->load_final_carrier_fee == 0 || $loads->load_final_carrier_fee == null)
+               ? 'Your Carrier Rate is 0'
+               : 'CPR is not Verified'
+       }}">
+
+        <i class="fas fa-file-pdf dynamic-data"
+           style="margin:0 10px; font-size:20px;"></i>
+
+        Carrier RC
+
+    </a>
+
+@else
+
+    <a href="{{ route('rc.download.pdf', $loads->load_number) }}"
+       target="_blank">
+
+        <i class="fas fa-file-pdf dynamic-data"
+           style="margin:0 10px; font-size:20px;"></i>
+
+        Carrier RC
+
+    </a>
+
+@endif
                     @if($loads->shipper_load_final_rate == 0 || $loads->shipper_load_final_rate == null)
                      <a href="javascript:void(0);" style="color: #0c7ce6; cursor:not-allowed" title="Your Customer Rate is 0">
                         <i class="fas fa-file-pdf dynamic-data" style="margin:0 10px; font-size: 20px;"></i> Shipper RC
