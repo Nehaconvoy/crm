@@ -1577,6 +1577,12 @@ public function all_search(Request $request)
                 ->where(function ($query) use ($searchTerms) {
                     foreach ($searchTerms as $term) {
                         $query->orWhere('load_number', 'like', "%$term%");
+                        $query->orWhereHas('customer', function ($customerQuery) use ($term) {
+                            $customerQuery->where('customer_name', 'like', "%$term%");
+                        });
+                        $query->orWhereHas('user', function ($userQuery) use ($term) {
+                            $userQuery->where('users.name', 'like', "%$term%");
+                        });
                         // $query->orwhere('load_workorder', 'like', "%$term%");
                         // ...baaki commented fields same rahenge
                     }
@@ -1624,6 +1630,12 @@ public function all_search(Request $request)
                             $query->orWhere('load_number', 'like', "%$term%");
                             $query->orwhere('load_workorder', 'like', "%$term%");
                             $query->orwhere('customer_refrence_number', 'like', "%$term%");
+                            $query->orWhereHas('customer', function ($customerQuery) use ($term) {
+                                $customerQuery->where('customer_name', 'like', "%$term%");
+                            });
+                            $query->orWhereHas('user', function ($userQuery) use ($term) {
+                                $userQuery->where('users.name', 'like', "%$term%");
+                            });
                         }
                     })
                     ->orderBy('id', 'desc')
@@ -1658,6 +1670,12 @@ public function all_search(Request $request)
                             $query->orWhere('load_number', 'like', "%$term%");
                             $query->orwhere('load_workorder', 'like', "%$term%");
                             $query->orwhere('customer_refrence_number', 'like', "%$term%");
+                            $query->orWhereHas('customer', function ($customerQuery) use ($term) {
+                                $customerQuery->where('customer_name', 'like', "%$term%");
+                            });
+                            $query->orWhereHas('user', function ($userQuery) use ($term) {
+                                $userQuery->where('users.name', 'like', "%$term%");
+                            });
                         }
                     })
                     ->orderBy('id', 'desc')
@@ -1692,6 +1710,12 @@ public function all_search(Request $request)
                             $query->orWhere('load_number', 'like', "%$term%");
                             $query->orwhere('load_workorder', 'like', "%$term%");
                             $query->orwhere('customer_refrence_number', 'like', "%$term%");
+                            $query->orWhereHas('customer', function ($customerQuery) use ($term) {
+                                $customerQuery->where('customer_name', 'like', "%$term%");
+                            });
+                            $query->orWhereHas('user', function ($userQuery) use ($term) {
+                                $userQuery->where('users.name', 'like', "%$term%");
+                            });
                         }
                     })
                     ->orderBy('id', 'desc')
@@ -1725,6 +1749,12 @@ public function all_search(Request $request)
                             $query->orWhere('load_number', 'like', "%$term%");
                             $query->orwhere('load_workorder', 'like', "%$term%");
                             $query->orwhere('customer_refrence_number', 'like', "%$term%");
+                            $query->orWhereHas('customer', function ($customerQuery) use ($term) {
+                                $customerQuery->where('customer_name', 'like', "%$term%");
+                            });
+                            $query->orWhereHas('user', function ($userQuery) use ($term) {
+                                $userQuery->where('users.name', 'like', "%$term%");
+                            });
                         }
                     })
                     ->orderBy('id', 'desc')
@@ -1759,6 +1789,12 @@ public function all_search(Request $request)
                             $query->orWhere('load_number', 'like', "%$term%");
                             $query->orwhere('load_workorder', 'like', "%$term%");
                             $query->orwhere('customer_refrence_number', 'like', "%$term%");
+                            $query->orWhereHas('customer', function ($customerQuery) use ($term) {
+                                $customerQuery->where('customer_name', 'like', "%$term%");
+                            });
+                            $query->orWhereHas('user', function ($userQuery) use ($term) {
+                                $userQuery->where('users.name', 'like', "%$term%");
+                            });
                         }
                     })
                     ->orderBy('id', 'desc')
