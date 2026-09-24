@@ -5613,6 +5613,8 @@ public function customerDetailsReportingExcell()
 
     public function loadCompleteReportingExcel()
     {
+        set_time_limit(0);
+
         $loadQuery = Load::where('load_status', 'Completed');
 
         $maxConsignees = 0;
@@ -5631,19 +5633,19 @@ public function customerDetailsReportingExcell()
         
          $headers = array_merge($headers, ['Load Type','Carrier Advance Payment','Actual Delivery Date','Carrier Due Date','Carrier Mark Payment Date','Carrier Payment Status','Carrier Fee','Shipper Rate','Invoice Date','Paper work Received Date','Payment Receiving Date','Customer Payment Received Amount','Customer Payment Mark Date','Customer Rate','Customer Fsc','Customer Other Charges','Customer Final Rate','Carrier Rate','Carrier Fsc','Carrier Other Charges','Carrier Final Rate','Margin','Margin %','Work Order','CPR Check','Macro Sent','Delivery Date','Shipper Date','Equipement Type','Shipment Type','CMT Agent','Currency' ]);
 
-        $outputPath = storage_path('app/load-complete-report-' . uniqid('', true) . '.csv');
-        $output = fopen($outputPath, 'w');
-
-        $sheet = new class($output) {
+        $spreadsheet = new Spreadsheet();
+        $worksheet = $spreadsheet->getActiveSheet();
+        $sheet = new class($worksheet) {
             private int $currentRow = 0;
             private array $values = [];
 
-            public function __construct(private $output)
+            public function __construct(private $worksheet)
             {
             }
 
             public function setTitle(string $title): void
             {
+                $this->worksheet->setTitle($title);
             }
 
             public function setCellValue(string $coordinate, mixed $value): void
@@ -5652,8 +5654,7 @@ public function customerDetailsReportingExcell()
                 $row = (int) $matches[2];
 
                 if ($this->currentRow !== 0 && $row !== $this->currentRow) {
-                    fputcsv($this->output, $this->values);
-                    $this->values = [];
+                    $this->flushRow();
                 }
 
                 $this->currentRow = $row;
@@ -5667,12 +5668,18 @@ public function customerDetailsReportingExcell()
 
             public function finish(): void
             {
+                $this->flushRow();
+            }
+
+            private function flushRow(): void
+            {
                 if ($this->values !== []) {
-                    fputcsv($this->output, $this->values);
+                    $this->worksheet->fromArray([array_values($this->values)], null, 'A' . $this->currentRow);
+                    $this->values = [];
                 }
-                fclose($this->output);
             }
         };
+        $sheet->setTitle('Completed Loads');
 
         $col = 'A';
         foreach ($headers as $header) {
@@ -5682,7 +5689,15 @@ public function customerDetailsReportingExcell()
 
         $row = 2;
         $index = 0;
-        foreach (Load::with('user')->where('load_status', 'Completed')->latest('created_at')->cursor() as $item) {
+        $completedLoads = Load::query()
+            ->leftJoin('users', 'users.id', '=', 'loads.user_id')
+            ->select('loads.*', 'users.name as agent_name')
+            ->where('loads.load_status', 'Completed')
+            ->orderBy('loads.created_at', 'asc')
+            ->orderBy('loads.id', 'asc')
+            ->cursor();
+
+        foreach ($completedLoads as $item) {
             $col = 'A';
             $sheet->setCellValue($col . $row, ++$index);
             $col++;
@@ -5698,7 +5713,7 @@ public function customerDetailsReportingExcell()
             $col++;
             $sheet->setCellValue($col . $row, in_array($item->invoice_status, ['Paid Record', 'Paid']) ? ($item->invoice_number ?? '') : '');
             $col++;
-            $sheet->setCellValue($col . $row, $item->user->name ?? '');
+            $sheet->setCellValue($col . $row, $item->agent_name ?? '');
             $col++;
             $sheet->setCellValue($col . $row, $item->load_status ?? '');
             $col++;
@@ -5907,12 +5922,14 @@ public function customerDetailsReportingExcell()
             $row++;
         }
 
-        $filename = 'Load Complete Report ' . date('Y-m-d') . '.xlsx';
         $sheet->finish();
-        $filename = str_replace('.xlsx', '.csv', $filename);
+        $writer = new Xlsx($spreadsheet);
+        $filename = 'Load Complete Report ' . date('Y-m-d') . '.xlsx';
+        $outputPath = storage_path('app/load-complete-report-' . uniqid('', true) . '.xlsx');
+        $writer->save($outputPath);
 
         return response()->download($outputPath, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ])->deleteFileAfterSend(true);
     }
 
