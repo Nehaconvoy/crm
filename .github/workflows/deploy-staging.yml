@@ -30,6 +30,9 @@ jobs:
       DEPLOY_BRANCH: devN
       PHP_BIN: ${{ vars.PHP_BIN }}
       COMPOSER_BIN: ${{ vars.COMPOSER_BIN }}
+      # Token used ON THE SERVER to fetch the private repo over HTTPS.
+      # Prefers a dedicated deploy PAT; falls back to the workflow token.
+      GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN || github.token }}
 
     steps:
       - name: Deploy to staging server
@@ -43,7 +46,7 @@ jobs:
           timeout: 60s
           command_timeout: 30m
           debug: true
-          envs: DEPLOY_PATH,WEB_ROOT,DEPLOY_BRANCH,PHP_BIN,COMPOSER_BIN
+          envs: DEPLOY_PATH,WEB_ROOT,DEPLOY_BRANCH,PHP_BIN,COMPOSER_BIN,GH_DEPLOY_TOKEN
           script: |
             set -euo pipefail
 
@@ -53,17 +56,38 @@ jobs:
             WEB_ROOT="${WEB_ROOT:-${DEPLOY_PATH}/public}"
             DEPLOY_BRANCH="${DEPLOY_BRANCH:-devN}"
 
+            if [[ -z "${GH_DEPLOY_TOKEN:-}" ]]; then
+              echo "ERROR: GH_DEPLOY_TOKEN is empty. Add a GH_DEPLOY_TOKEN secret (a PAT with read access to the repo)."
+              exit 1
+            fi
+
+            # Authenticated HTTPS URL so the private repo can be fetched non-interactively.
+            AUTH_REMOTE="https://x-access-token:${GH_DEPLOY_TOKEN}@github.com/amrentech1230/crm.git"
+            PLAIN_REMOTE="https://github.com/amrentech1230/crm.git"
+
             mkdir -p "$DEPLOY_PATH"
             cd "$DEPLOY_PATH"
 
             if [[ ! -d .git ]]; then
               git init
-              git remote add origin "https://github.com/amrentech1230/crm.git"
             fi
+
+            # Set/refresh origin idempotently (works whether or not origin already exists).
+            if git remote get-url origin >/dev/null 2>&1; then
+              git remote set-url origin "$AUTH_REMOTE"
+            else
+              git remote add origin "$AUTH_REMOTE"
+            fi
+
+            # Make sure the token is never persisted in the repo config after this run.
+            trap 'git remote set-url origin "$PLAIN_REMOTE" || true' EXIT
 
             git fetch --all --prune
             git reset --hard "origin/$DEPLOY_BRANCH"
             echo "Deployed commit: $(git rev-parse HEAD)"
+
+            # Scrub the token from origin now that fetch is done.
+            git remote set-url origin "$PLAIN_REMOTE"
 
             $COMPOSER_BIN install --no-interaction --prefer-dist --optimize-autoloader --no-dev
             $PHP_BIN artisan down --retry=15 || true
