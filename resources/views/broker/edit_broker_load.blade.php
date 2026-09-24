@@ -424,7 +424,7 @@
                                                                     </div>
                                                                     <div class="col-md-3">
                                                                         <div class="form-group">
-                                                                            <input type="text" step="0.01" class="form-control shipperchargeAmount"
+                                                                            <input type="text" step="0.01" min="0" class="form-control shipperchargeAmount"
                                                                                 name="shipperchargeAmount[{{ $index }}]"
                                                                                 value="{{ $shipperCharge['amount'] ?? 0 }}"
                                                                                 placeholder="Enter Amount">
@@ -2367,7 +2367,7 @@ $(document).ready(function () {
             </div>
             <div class="col-md-3">
                 <div class="form-group">
-                    <input type="text" class="form-control shipperchargeAmount" name="shipperchargeAmount[${rowIndex}]" placeholder="Enter Amount">
+                    <input type="text" class="form-control shipperchargeAmount" name="shipperchargeAmount[${rowIndex}]" placeholder="Enter Amount" min=0>
                 </div>
             </div>
             <div class="col-md-1" style="margin-top: 11px;">
@@ -3028,7 +3028,31 @@ async function downloadBOL() {
 }
 
 </script>
+<script>
+    $(document).on('input', '.shipperchargeAmount', function () {
 
+        var value = $(this).val().trim();
+
+        // Check if user enters minus (-) or any negative amount
+        if (value.includes('-')) {
+
+            alert('Minus amount is not allowed in Other Charges.');
+
+            $(this).val(0);
+            return;
+        }
+
+        // Check numeric value less than 0
+        var amount = parseFloat(value);
+
+        if (!isNaN(amount) && amount < 0) {
+
+            alert('Less than 0 amount is not allowed in Other Charges.');
+
+            $(this).val(0);
+        }
+    });
+</script>
 <style>
 
 #bolDownloadArea{
