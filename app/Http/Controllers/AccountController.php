@@ -1595,11 +1595,9 @@ public function editCustomer($id)
     $loggedRemainingCredit = collect($remainingCreditLogs)->sum(function ($credit) {
         return (float) ($credit['credit_limit'] ?? 0);
     });
-    $remainingCredit = max(
-        0.0,
-        (float) ($customer->remaining_credit ?? 0),
-        $loggedRemainingCredit
-    );
+    $remainingCredit = $customer->remaining_credit !== null && $customer->remaining_credit !== ''
+        ? max(0.0, (float) $customer->remaining_credit)
+        : max(0.0, $loggedRemainingCredit);
     $usedAmount = $totalExhaustedLimit;
     $after_used_remaing_amount = $remainingCredit;
     $afterpaymentremaingamount = max(0.0, $after_used_remaing_amount + $receiving_amount);
