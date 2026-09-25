@@ -1051,6 +1051,7 @@ $(document).on('click', '.custom-pagination a', function (e) {
                     dom: 'frtip',
                     buttons: ['copy', 'excel', 'pdf', 'colvis'],
                     pageLength: 50,
+                    paging: false,
                 });
                 tables[target].initialized = true;
             }
@@ -1063,7 +1064,8 @@ $(document).on('click', '.custom-pagination a', function (e) {
                 dom: 'frtip',
                 buttons: ['copy', 'excel', 'pdf', 'colvis'],
                 pageLength: 50, // ✅ default show 50
-                lengthMenu: [10, 25, 50, 100] // ✅ dropdown options
+                lengthMenu: [10, 25, 50, 100], // ✅ dropdown options
+                paging: false,
             });
             tables[activeTab].initialized = true;
         }
