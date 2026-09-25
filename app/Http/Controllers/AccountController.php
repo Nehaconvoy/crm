@@ -2990,8 +2990,7 @@ public function getCarrierFiles($id)
 public function deleteCarrierFile(Request $request)
 {
     $id = (int) $request->input('load_id');
-    $file = 'carrierFiles/'.$id.'/'.$request->input('file_name');
-   
+    $fileName = basename((string) $request->input('file_name'));
 
     $load = Load::where('id', $id)->first();
     if (!$load) {
@@ -2999,16 +2998,24 @@ public function deleteCarrierFile(Request $request)
     }
 
     $existingFiles = json_decode($load->carrierDoc, true) ?: [];
+    $filesToDelete = array_values(array_filter($existingFiles, function ($storedFile) use ($fileName) {
+        return basename($storedFile) === $fileName;
+    }));
 
-    // Remove file from DB
-    $newFiles = array_filter($existingFiles, fn($f) => $f !== $file);
-    $load->carrierDoc = json_encode(array_values($newFiles));
+    if (empty($filesToDelete)) {
+        return response()->json(['success' => false, 'message' => 'File not found'], 404);
+    }
+
+    $load->carrierDoc = json_encode(array_values(array_filter($existingFiles, function ($storedFile) use ($fileName) {
+        return basename($storedFile) !== $fileName;
+    })));
     $load->save();
 
-    // Delete file from disk
-    $fullPath = public_path($file);
-    if (file_exists($fullPath)) {
-        unlink($fullPath);
+    foreach ($filesToDelete as $storedFile) {
+        $fullPath = public_path($storedFile);
+        if (is_file($fullPath)) {
+            unlink($fullPath);
+        }
     }
 
     return response()->json(['success' => true]);

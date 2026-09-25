@@ -805,4 +805,58 @@ $(document).ready(function() {
 </script>
 
 
+<script>
+$(function () {
+    const vendorTableBody = $('#vendor-search');
+
+    vendorTableBody.off('change.vendorDocuments', '.carrier_documents')
+        .on('change.vendorDocuments', '.carrier_documents', function () {
+            const select = $(this);
+            const savedValue = select.data('saved-value') || '';
+            const documentValue = select.val() || '';
+
+            select.prop('disabled', true);
+
+            $.ajax({
+                url: "{{ route('account.update-carrier-documents') }}",
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                    id: select.data('id'),
+                    carrier_documents: documentValue
+                },
+                success: function (response) {
+                    if (!response.success) {
+                        select.val(savedValue);
+                        return;
+                    }
+
+                    const persistedValue = response.carrier_documents || '';
+                    select.data('saved-value', persistedValue);
+                    select.val(persistedValue);
+
+                    $('#mc-success-message').text(response.message).fadeIn();
+                    setTimeout(function () {
+                        $('#mc-success-message').text('').fadeOut();
+                    }, 1500);
+                },
+                error: function (xhr) {
+                    select.val(savedValue);
+                    console.error('Carrier document save failed:', xhr.responseText);
+
+                    $('#mc-error-message')
+                        .text(xhr.responseJSON?.message || 'Unable to save document selection.')
+                        .fadeIn();
+                    setTimeout(function () {
+                        $('#mc-error-message').text('').fadeOut();
+                    }, 3000);
+                },
+                complete: function () {
+                    select.prop('disabled', false);
+                }
+            });
+        });
+});
+</script>
 @endsection

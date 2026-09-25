@@ -113,6 +113,7 @@ $rowClass = 'row-completed';
             class="form-control vendor-select carrier_documents"
             name="carrier_documents"
             data-id="{{ $vendor->id }}"
+            data-saved-value="{{ $vendor->carrier_documents ?? '' }}"
         >
             <option value="">Select Document</option>
 
@@ -206,23 +207,23 @@ $rowClass = 'row-completed';
                                     <div style="margin-bottom: 20px;">
                                         @if(in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']))
                                         <!-- Image Preview -->
-                                        <a href="{{ asset('public/'.$file) }}" target="_blank">
-                                            <img src="{{ asset('public/'.$file) }}" alt="Image"
+                                        <a href="{{ asset($file) }}" target="_blank">
+                                            <img src="{{ asset($file) }}" alt="Image"
                                                 style="max-width: 500px;">
                                         </a>
                                         @elseif($extension === 'pdf')
                                         <!-- PDF Preview -->
-                                        <a href="{{ asset('public/'.$file) }}" target="_blank">
-                                            <embed src="{{ asset('public/'.$file) }}" type="application/pdf" width="600"
+                                        <a href="{{ asset($file) }}" target="_blank">
+                                            <embed src="{{ asset($file) }}" type="application/pdf" width="600"
                                                 height="400" />
                                         </a>
                                         @elseif(in_array($extension, ['doc', 'docx']))
                                         <!-- Word Preview with Google Docs Viewer -->
                                         <iframe
-                                            src="https://docs.google.com/gview?url={{ urlencode(asset('public/'.$file)) }}&embedded=true"
+                                            src="https://docs.google.com/gview?url={{ urlencode(asset($file)) }}&embedded=true"
                                             style="width:600px; height:500px;" frameborder="0"></iframe>
                                         <br>
-                                        <a href="{{ asset('public/'.$file) }}" target="_blank">Download Word
+                                        <a href="{{ asset($file) }}" target="_blank">Download Word
                                             Document</a>
                                         @else
                                         <p>Unsupported file type.</p>
@@ -797,61 +798,6 @@ $(document).on('change', '.carrier_invoice_date', function () {
     });
 });
 
-$(document).on('change', '.carrier_documents', function () {
-
-    var documentValue = $(this).val();
-    var vendorId = $(this).data('id');
-
-    $.ajax({
-        url: '/account/update-carrier-documents',
-        method: 'POST',
-
-        data: {
-            id: vendorId,
-            carrier_documents: documentValue
-        },
-
-        headers: {
-            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-        },
-
-        success: function (response) {
-
-            if (response.success) {
-
-                $('#mc-success-message')
-                    .text(response.message)
-                    .fadeIn();
-
-                setTimeout(function () {
-                    $('#mc-success-message')
-                        .text('')
-                        .fadeOut();
-                }, 1000);
-            }
-        },
-
-        error: function (xhr) {
-
-            console.error('Error:', xhr.responseText);
-
-            $('#mc-error-message')
-                .text(
-                    xhr.responseJSON?.message ||
-                    'Something went wrong.'
-                )
-                .fadeIn();
-
-            setTimeout(function () {
-                $('#mc-error-message')
-                    .text('')
-                    .fadeOut();
-            }, 1000);
-        }
-    });
-});
-
-
         $(document).ready(function () {
             $(document).on('change', '.quick_pay', function (e) {
                 var load_id = $(this).data('id');
@@ -968,45 +914,8 @@ $(document).on('change', '.carrier_documents', function () {
             });
         });
 
-        $(document).ready(function () {
-            // Handle file upload
-            $('.carrierDoc').on('change', function () {
-
-                var input = $(this);
-                var files = input[0].files;
-                var id = input.data('id'); // Get the vendor ID
-                var formData = new FormData();
-
-                // Append files and ID to FormData
-                for (var i = 0; i < files.length; i++) {
-                    formData.append('carrierDoc[]', files[i]);
-                }
-                formData.append('id', id); // Append the vendor ID
-
-                // Send the AJAX request
-                $.ajax({
-                    url: '/uploadCarrierDocs', // Your route for uploading
-                    type: 'POST',
-                    data: formData,
-                    contentType: false, // Don't set content type (important for FormData)
-                    processData: false, // Don't process the data (important for FormData)
-                    success: function (response) {
-                        // Handle the success response
-                        if (response.success) {
-                            alert('Files uploaded successfully!');
-                            location.reload();
-                        } else {
-                            alert('Error: ' + response.message);
-                        }
-                    },
-
-                });
-            });
-        });
-    </script>
-
 <script>
-$(document).on('change', '.carrier_mark_as_paid', function () {
+$(document).off('change.carrierMarkPaid', '.carrier_mark_as_paid').on('change.carrierMarkPaid', '.carrier_mark_as_paid', function () {
 
     var checkbox = $(this);
     var loadId = checkbox.data('id');
@@ -1021,7 +930,7 @@ $(document).on('change', '.carrier_mark_as_paid', function () {
             },
             success: function (response) {
 
-                if (response.status === 'success') {
+                if (response.success) {
                     // Replace checkbox with text
                     checkbox.closest('td').html('<span style="color:green;font-weight:600;">Paid</span>');
                     
@@ -1042,8 +951,7 @@ $(document).on('change', '.carrier_mark_as_paid', function () {
 </script>
 
     <script>
-        $(document).ready(function () {
-            $(document).on('change', '.carrierDoc', function () {
+            $(document).off('change.carrierDoc', '.carrierDoc').on('change.carrierDoc', '.carrierDoc', function () {
                 let input = $(this);
                 let files = input[0].files;
                 let id = input.data('id');
@@ -1070,7 +978,7 @@ $(document).on('change', '.carrier_mark_as_paid', function () {
                     success: function (res) {
                         if (res.success) {
                             alert('Files uploaded successfully!');
-                            // location.reload();
+                            location.reload();
                         } else {
                             alert('Upload failed: ' + res.message);
                         }
@@ -1080,7 +988,6 @@ $(document).on('change', '.carrier_mark_as_paid', function () {
                     }
                 });
             });
-        });
     </script>
 
     <script>
