@@ -1485,10 +1485,28 @@ public function editCustomer($id)
         return redirect()->back()->with('error', 'Customer not found.');
     }
 
-    // Fetch all users
-    $users = User::with('role', 'department', 'managers', 'teamleader', 'office')->where('department', 3)->get();
+    // Fetch all users who can be assigned as a broker/customer owner. Include the current assigned user
+    // even when they do not belong to the department-3 broker list.
+    $users = User::with('role', 'department', 'managers', 'teamleader', 'office')
+        ->orderBy('name')
+        ->get();
 
+    if ($customer->user_id) {
+        $currentAssignedUser = User::find($customer->user_id);
+        if ($currentAssignedUser && !$users->contains('id', $currentAssignedUser->id)) {
+            $users->push($currentAssignedUser);
+        }
+    }
 
+    $latestLoadBrokerId = Load::where('customer_id', $customer->id)
+        ->whereNotNull('user_id')
+        ->latest('created_at')
+        ->value('user_id');
+
+    if ($latestLoadBrokerId && (string) $customer->user_id !== (string) $latestLoadBrokerId) {
+        $customer->user_id = $latestLoadBrokerId;
+        $customer->saveQuietly();
+    }
 
     $credits = json_decode($customer->remaining_credit_logs, true);
     if (!is_array($credits) || count($credits) === 0) {
@@ -1591,13 +1609,85 @@ public function editCustomer($id)
         ->sum('receiving_amount'));
 
     $totalExhaustedLimit = max(0.0, $loadcreateamount - $receiving_amount);
-    $remainingCreditLogs = json_decode($customer->remaining_credit_logs, true) ?? [];
-    $loggedRemainingCredit = collect($remainingCreditLogs)->sum(function ($credit) {
-        return (float) ($credit['credit_limit'] ?? 0);
-    });
-    $remainingCredit = $customer->remaining_credit !== null && $customer->remaining_credit !== ''
-        ? max(0.0, (float) $customer->remaining_credit)
-        : max(0.0, $loggedRemainingCredit);
+    $usedCredit = max(0.0, $loadcreateamount);
+    $remainingCredit = max(0.0, $totalCreditLimit - $usedCredit);
+    $customerBrokerIds = Load::where($customerLoadScope)
+        ->whereNotNull('user_id')
+        ->pluck('user_id')
+        ->map(fn ($userId) => (string) $userId);
+    $creditLogUsers = collect();
+    $creditLogUserIds = collect();
+    foreach ([$customer->credit_limit_log, $customer->remaining_credit_logs, $customer->invoice_credit_limit_log] as $logJson) {
+        $logEntries = json_decode($logJson, true);
+        foreach (is_array($logEntries) ? $logEntries : [] as $logEntry) {
+            if (!empty($logEntry['user_id'])) {
+                $userId = (string) $logEntry['user_id'];
+                $creditLogUserIds->push($userId);
+                if (!empty($logEntry['user_name'])) {
+                    $creditLogUsers->put($userId, $logEntry['user_name']);
+                }
+            }
+        }
+    }
+    $creditLogUserIds = $creditLogUserIds->merge($customerBrokerIds)->unique()->values();
+    if ($creditLogUserIds->isNotEmpty()) {
+        User::whereIn('id', $creditLogUserIds->all())->get(['id', 'name'])->each(function ($user) use ($creditLogUsers) {
+            if (!$creditLogUsers->has((string) $user->id)
+                || $creditLogUsers->get((string) $user->id) === 'User ' . $user->id) {
+                $creditLogUsers->put((string) $user->id, $user->name);
+            }
+        });
+    }
+    foreach ($creditLogUserIds as $userId) {
+        if (!$creditLogUsers->has($userId)) {
+            $creditLogUsers->put($userId, 'User ' . $userId);
+        }
+    }
+    if ($customer->user_id) {
+        $creditLogUsers->put((string) $customer->user_id, optional($customer->user)->name ?? 'Current User');
+    }
+    $brokerLoadHistory = Load::where($customerLoadScope)
+        ->with('user:id,name')
+        ->get(['id', 'load_number', 'user_id', 'load_bill_to', 'invoice_date', 'invoice_status', 'shipper_load_final_rate', 'load_final_rate', 'receiving_amount', 'created_at'])
+        ->groupBy(function ($load) {
+            return $load->user_id ?: 'unassigned';
+        })
+        ->map(function ($brokerLoads, $brokerId) {
+            $broker = $brokerLoads->first()->user;
+
+            return [
+                'broker_id' => $brokerId,
+                'broker_name' => $broker?->name ?? 'Unassigned',
+                'load_count' => $brokerLoads->count(),
+                'load_total' => $brokerLoads->sum(function ($load) {
+                    return (float) ($load->shipper_load_final_rate ?: $load->load_final_rate ?: 0);
+                }),
+                'loads' => $brokerLoads->sortByDesc('created_at')->values(),
+            ];
+        })
+        ->sortByDesc('load_count')
+        ->values();
+
+    $creditLimitHistory = collect();
+    foreach ([
+        ['value' => $customer->credit_limit_log, 'type' => 'Assigned Credit'],
+        ['value' => $customer->remaining_credit_logs, 'type' => 'Remaining Credit'],
+        ['value' => $customer->invoice_credit_limit_log, 'type' => 'Invoice Credit'],
+    ] as $creditSource) {
+        $entries = json_decode($creditSource['value'], true);
+        foreach (is_array($entries) ? $entries : [] as $entry) {
+            $userId = (string) ($entry['user_id'] ?? '');
+            $creditLimitHistory->push([
+                'type' => $creditSource['type'],
+                'broker_id' => $userId ?: 'legacy',
+                'credit_limit' => (float) ($entry['credit_limit'] ?? 0),
+                'credit_time' => $entry['credit_time'] ?? null,
+                'broker_name' => $entry['user_name'] ?? ($creditLogUsers->get($userId) ?? 'Legacy / Unassigned'),
+            ]);
+        }
+    }
+    $creditLimitHistory = $creditLimitHistory->sortByDesc('credit_time')->values();
+
     $usedAmount = $totalExhaustedLimit;
     $after_used_remaing_amount = $remainingCredit;
     $afterpaymentremaingamount = max(0.0, $after_used_remaing_amount + $receiving_amount);
@@ -1660,7 +1750,7 @@ $totalCustomerPayment = $loadDataabove30days->sum('customer_payment');
 	
 	$state = json_decode($states, true);
     
-    return view('accounts.customer_edit', compact('totalCustomerPayment', 'loadDatacustomeraging', 'loadDataabove30days', 'pendingpayment', 'dailyInvoiceTotals', 'customer', 'usedAmount', 'remainingCredit', 'totalFinalRate', 'users', 'customerAging','last30Days','loadcreateamount', 'receiving_amount', 'afterpaymentremaingamount', 'totalCreditLimit', 'allcountry', 'state'));
+    return view('accounts.customer_edit', compact('totalCustomerPayment', 'loadDatacustomeraging', 'loadDataabove30days', 'pendingpayment', 'dailyInvoiceTotals', 'customer', 'usedAmount', 'remainingCredit', 'totalFinalRate', 'users', 'creditLogUsers', 'brokerLoadHistory', 'creditLimitHistory', 'customerAging','last30Days','loadcreateamount', 'receiving_amount', 'afterpaymentremaingamount', 'totalCreditLimit', 'allcountry', 'state'));
 }
 
 
@@ -1715,6 +1805,20 @@ public function accountupdateCustomer(Request $request, $id)
     // Decode existing credit limit logs or initialize an empty array
     $existingCreditLogs = json_decode($customer->credit_limit_log, true);
     $existingCreditLogs = is_array($existingCreditLogs) ? $existingCreditLogs : [];
+    $previousUserId = $customer->user_id;
+    $previousUserName = optional($customer->user)->name;
+    $selectedUserId = $request->input('user_id');
+    $selectedUserName = $selectedUserId ? optional(User::find($selectedUserId))->name : null;
+    $tagExistingCreditLogs = function (array $logs) use ($previousUserId, $previousUserName): array {
+        return array_map(function (array $log) use ($previousUserId, $previousUserName): array {
+            if (empty($log['user_id'])) {
+                $log['user_id'] = $previousUserId;
+                $log['user_name'] = $previousUserName;
+            }
+            return $log;
+        }, $logs);
+    };
+    $existingCreditLogs = $tagExistingCreditLogs($existingCreditLogs);
 
     // Prepare new credit limit logs
     $newCreditLimitLogs = [];
@@ -1726,6 +1830,8 @@ public function accountupdateCustomer(Request $request, $id)
                 $newCreditLimitLogs[] = [
                     'credit_limit' => $creditLimit,
                     'credit_time' => $creditTimes[$index],
+                    'user_id' => $selectedUserId,
+                    'user_name' => $selectedUserName,
                 ];
             }
         }
@@ -1735,6 +1841,7 @@ public function accountupdateCustomer(Request $request, $id)
     $existinginvoiceremaningCreditLogs = is_array($existinginvoiceremaningCreditLogs)
         ? $existinginvoiceremaningCreditLogs
         : [];
+    $existinginvoiceremaningCreditLogs = $tagExistingCreditLogs($existinginvoiceremaningCreditLogs);
     $newinvoiceCreditLimitLogs = [];
     $remainingcreditLimitLogData = $request->input('invoice_credit_limits', []);
     $invoicecreditTimes = $request->input('invoice_credit_time', []);
@@ -1744,6 +1851,8 @@ public function accountupdateCustomer(Request $request, $id)
                 $newinvoiceCreditLimitLogs[] = [
                     'credit_limit' => $creditLimit,
                     'credit_time' => now()->format("Y-m-d\TH:i"),
+                    'user_id' => $selectedUserId,
+                    'user_name' => $selectedUserName,
                 ];
             }
         }
@@ -1753,6 +1862,7 @@ public function accountupdateCustomer(Request $request, $id)
     $existingremaningCreditLogs = is_array($existingremaningCreditLogs)
         ? $existingremaningCreditLogs
         : [];
+    $existingremaningCreditLogs = $tagExistingCreditLogs($existingremaningCreditLogs);
     $newremaningCreditLimitLogs = [];
     $remainingcreditLimitLogData = $request->input('new_remaing_credit_limit', []);
     $creditTimes = $request->input('new_remaing_credit_time', []);
@@ -1763,6 +1873,8 @@ public function accountupdateCustomer(Request $request, $id)
                 $newremaningCreditLimitLogs[] = [
                     'credit_limit' => $creditLimit,
                     'credit_time' => $creditTimes[$index] ?? now()->format('Y-m-d\TH:i'),
+                    'user_id' => $selectedUserId,
+                    'user_name' => $selectedUserName,
                 ];
             }
         }

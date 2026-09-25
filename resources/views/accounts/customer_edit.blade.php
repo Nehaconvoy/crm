@@ -31,6 +31,26 @@
    span.select2.select2-container.select2-container--default {
 		z-index: 9 !important;
 	}
+
+    .customer-history-box .table {
+        margin-bottom: 0;
+    }
+
+    .customer-history-box .table th {
+        white-space: nowrap;
+        font-size: 12px;
+    }
+
+    .customer-history-box .table td {
+        font-size: 13px;
+        vertical-align: middle;
+    }
+
+    .customer-history-box .history-section-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin: 0;
+    }
 </style>
 
  
@@ -209,6 +229,20 @@
                                
                                 </div>
                            </div>
+                                    <div class="col-md-3 mt-2">
+                                        <div class="form-group">
+                                            <label for="credit_log_user_filter">Credit Log User</label>
+                                            <select class="form-control" id="credit_log_user_filter">
+                                                <option value="all">All Brokers</option>
+                                                @if($creditLimitHistory->contains(fn ($entry) => $entry['broker_id'] === 'legacy'))
+                                                    <option value="legacy">Legacy / Unassigned</option>
+                                                @endif
+                                                @foreach($creditLogUsers->sort() as $creditLogUserId => $creditLogUserName)
+                                                    <option value="{{ $creditLogUserId }}">{{ ucwords($creditLogUserName) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
                            <div class="col-md-3 mt-2">
                               <div class="form-group">
                                  <label for="used_amount">Total Exhausted Limit</label>
@@ -292,6 +326,10 @@
                                     }
                                 }
 
+                                if ($finalTotalCredit <= 0) {
+                                    $finalTotalCredit = (float) ($totalCreditLimit ?? $customer->adv_customer_credit_limit ?? 0);
+                                }
+
                                 // Sum of every entry logged behind the invoice credit limit modal
                                 $invoiceCreditLogs = json_decode($customer->invoice_credit_limit_log, true) ?? [];
                                 $totalInvoiceCreditLimit = 0;
@@ -300,6 +338,10 @@
                                     foreach ($invoiceCreditLogs as $invoiceLog) {
                                         $totalInvoiceCreditLimit += (float) ($invoiceLog['credit_limit'] ?? 0);
                                     }
+                                }
+
+                                if ($totalInvoiceCreditLimit <= 0) {
+                                    $totalInvoiceCreditLimit = (float) ($customer->invoice_credit_limit ?? 0);
                                 }
 
                                 $combinedCreditLimit = $totalInvoiceCreditLimit + $finalTotalCredit;
@@ -395,6 +437,104 @@
                         </div>
                      </div>
 
+<div class="card mt-4 customer-history-box">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">{{ $customer->customer_name }} - Broker & Credit History</h4>
+        <span class="text-muted">{{ $brokerLoadHistory->sum('load_count') }} total loads</span>
+    </div>
+    <div class="card-body">
+        <div class="mb-4">
+            <h5 class="history-section-title mb-2">Broker Summary</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Broker</th>
+                            <th>Loads Created</th>
+                            <th>Total Load Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($brokerLoadHistory as $brokerHistory)
+                            <tr data-history-user="{{ $brokerHistory['broker_id'] }}">
+                                <td>{{ $brokerHistory['broker_name'] }}</td>
+                                <td>{{ $brokerHistory['load_count'] }}</td>
+                                <td>${{ number_format($brokerHistory['load_total'], 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3" class="text-center text-muted">No load history found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <h5 class="history-section-title mb-2">Load Creation Details</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Load</th>
+                            <th>Broker</th>
+                            <th>Status</th>
+                            <th>Amount</th>
+                            <th>Aging Amount</th>
+                            <th>Aging Days</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($brokerLoadHistory as $brokerHistory)
+                            @foreach($brokerHistory['loads'] as $historyLoad)
+                                <tr data-history-user="{{ $brokerHistory['broker_id'] }}" data-load-amount="{{ (float) ($historyLoad->shipper_load_final_rate ?: $historyLoad->load_final_rate ?: 0) }}" data-received-amount="{{ (float) ($historyLoad->receiving_amount ?: 0) }}">
+                                    <td>{{ optional($historyLoad->created_at)->format('m/d/Y h:i A') ?? 'N/A' }}</td>
+                                    <td>{{ $historyLoad->load_number }}</td>
+                                    <td>{{ $brokerHistory['broker_name'] }}</td>
+                                    <td>{{ $historyLoad->invoice_status ?: 'Pending' }}</td>
+                                    <td>${{ number_format((float) ($historyLoad->shipper_load_final_rate ?: $historyLoad->load_final_rate ?: 0), 2) }}</td>
+                                    <td>${{ number_format(max(0, (float) ($historyLoad->shipper_load_final_rate ?: $historyLoad->load_final_rate ?: 0) - (float) ($historyLoad->receiving_amount ?: 0)), 2) }}</td>
+                                    <td>{{ $historyLoad->invoice_date ? now()->diffInDays($historyLoad->invoice_date) : 'N/A' }}</td>
+                                </tr>
+                            @endforeach
+                        @empty
+                            <tr><td colspan="7" class="text-center text-muted">No load history found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <h5 class="history-section-title mb-2">Credit Limit History</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Limit Type</th>
+                            <th>Amount</th>
+                            <th>Added By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($creditLimitHistory as $limitHistory)
+                            <tr data-history-user="{{ $limitHistory['broker_id'] }}" data-credit-type="{{ $limitHistory['type'] }}" data-credit-amount="{{ $limitHistory['credit_limit'] }}">
+                                <td>{{ $limitHistory['credit_time'] ? date('m/d/Y h:i A', strtotime($limitHistory['credit_time'])) : 'N/A' }}</td>
+                                <td>{{ $limitHistory['type'] }}</td>
+                                <td>${{ number_format($limitHistory['credit_limit'], 2) }}</td>
+                                <td>{{ $limitHistory['broker_name'] }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="4" class="text-center text-muted">No credit-limit history found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal" id="invoice-credit-limit">
    <div class="modal-dialog">
 	  <div class="modal-content">
@@ -413,25 +553,26 @@
 		 <div class="modal-body invoice-model-body">
 			<!-- Existing Credit Logs -->
 			<div class="row form-row invoice-credit-entry">
-				  <div class="col-md-6">
+				  <div class="col-md-4">
 					 <div class="form-group">
 						<label class="mb-0">Credit Limit</label>
 					 </div>
 				  </div>
-				  <div class="col-md-5">
+				  <div class="col-md-4">
 					 <div class="form-group">
 						<label class="mb-0">Time & Date</label>
 					 </div>
 				  </div>
-				  <div class="col-md-1">
+				  <div class="col-md-3">
 					 <div class="form-group">
+						<label class="mb-0">User</label>
 					 </div>
 				  </div>
 			   </div>
 			   @if (!empty($invoice_credit_log))
 				  @foreach ($invoice_credit_log as $key => $credit)
-					 <div class="row form-row invoice-credit-log-entrys" data-index="{{ $key }}">
-						   <div class="col-md-6">
+                                    <div class="row form-row invoice-credit-log-entrys" data-index="{{ $key }}" data-credit-log-user="{{ $credit['user_id'] ?? 'legacy' }}">
+						   <div class="col-md-4">
 							  <div class="form-group">
 								 <input type="number" 
 										  class="form-control invoice-credit-limits" 
@@ -440,12 +581,18 @@
 										  placeholder="Enter invoice credit limit">
 							  </div>
 						   </div>
-						   <div class="col-md-5">
+						   <div class="col-md-4">
 							  <div class="form-group">
 								 <input type="datetime-local" 
 										  class="form-control credit-time" 
 										  readonly 
 										  value="{{ $credit['credit_time'] }}">
+							  </div>
+						   </div>
+						   <div class="col-md-3">
+							  <div class="form-group">
+								 <input type="text" class="form-control" readonly
+										value="{{ $credit['user_name'] ?? ($creditLogUsers->get((string) ($credit['user_id'] ?? '')) ?? (($credit['user_id'] ?? null) ? 'User ' . $credit['user_id'] : 'Legacy / Unassigned')) }}">
 							  </div>
 						   </div>
 						   <div class="col-md-1">
@@ -462,12 +609,12 @@
 
 			<!-- Add New Credit Limit -->
 			<div class="row form-row invoice-credit-log-entry">
-			   <div class="col-md-6">
+			   <div class="col-md-4">
 				  <div class="form-group">
 					 <input type="number" class="form-control invoice-credit-limit" placeholder="Enter invoice credit limit" name="invoice_credit_limits[]">
 				  </div>
 			   </div>
-			   <div class="col-md-5">
+			   <div class="col-md-4">
 				  <div class="form-group">
 					 <input type="datetime-local" class="form-control" name="invoice_credit_time[]" readonly value='{{ now()->format("Y-m-d\TH:i") }}'>
 				  </div>
@@ -726,13 +873,16 @@
                                  @php
                                     // Decode the credit limit log from the customer
                                     $credit_log = json_decode($customer->credit_limit_log, true) ?? [];
+                                                if (empty($credit_log)) {
+                                                    $credit_log = json_decode($customer->remaining_credit_logs, true) ?? [];
+                                                }
                                     $adv_customer_credit_limit = $customer->adv_customer_credit_limit ?? null;
                                  @endphp
 
                                  <div class="modal-body">
                                     <!-- Existing Credit Logs -->
                                     <div class="row form-row credit-log-entry">
-                                          <div class="col-md-6">
+                                          <div class="col-md-4">
                                              <div class="form-group">
                                                 <label class="mb-0">Credit Limit</label>
                                              </div>
@@ -742,15 +892,16 @@
                                                 <label class="mb-0">Time & Date</label>
                                              </div>
                                           </div>
-                                          <div class="col-md-1">
+                                          <div class="col-md-3">
                                              <div class="form-group">
+                                                <label class="mb-0">User</label>
                                              </div>
                                           </div>
                                        </div>
                                        @if (!empty($credit_log))
                                           @foreach ($credit_log as $key => $credit)
-                                             <div class="row form-row credit-log-entry" data-index="{{ $key }}">
-                                                   <div class="col-md-6">
+                                             <div class="row form-row credit-log-entry" data-index="{{ $key }}" data-credit-log-user="{{ $credit['user_id'] ?? 'legacy' }}">
+                                                   <div class="col-md-4">
                                                       <div class="form-group">
                                                          <input type="number" 
                                                                   class="form-control credit-limit" 
@@ -759,12 +910,18 @@
                                                                   placeholder="Enter credit limit">
                                                       </div>
                                                    </div>
-                                                   <div class="col-md-5">
+                                                   <div class="col-md-4">
                                                       <div class="form-group">
                                                          <input type="datetime-local" 
                                                                   class="form-control credit-time" 
                                                                   readonly 
                                                                   value="{{ $credit['credit_time'] }}">
+                                                      </div>
+                                                   </div>
+                                                   <div class="col-md-3">
+                                                      <div class="form-group">
+                                                         <input type="text" class="form-control" readonly
+                                                                  value="{{ $credit['user_name'] ?? ($creditLogUsers->get((string) ($credit['user_id'] ?? '')) ?? (($credit['user_id'] ?? null) ? 'User ' . $credit['user_id'] : 'Legacy / Unassigned')) }}">
                                                       </div>
                                                    </div>
                                                    <div class="col-md-1">
@@ -781,12 +938,12 @@
 
                                     <!-- Add New Credit Limit -->
                                     <div class="row form-row new-credit-log-entry">
-                                       <div class="col-md-6">
+                                       <div class="col-md-4">
                                           <div class="form-group">
                                              <input type="number" class="form-control credit-limit" placeholder="Enter credit limit" name="new_credit_limit[]">
                                           </div>
                                        </div>
-                                       <div class="col-md-5">
+                                       <div class="col-md-4">
                                           <div class="form-group">
                                              <input type="datetime-local" class="form-control" name="new_credit_time[]" readonly value="{{ now()->format('Y-m-d\TH:i') }}">
                                           </div>
@@ -849,7 +1006,7 @@
             </div>
             <!-- Existing Credit Logs -->
             <div class="row form-row credit-log-entry">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="form-group">
                         <label class="mb-0">Remaining Credit Limit</label>
                         </div>
@@ -859,15 +1016,16 @@
                         <label class="mb-0">Time & Date</label>
                         </div>
                     </div>
-                    <div class="col-md-1">
+                    <div class="col-md-3">
                         <div class="form-group">
+                        <label class="mb-0">User</label>
                         </div>
                     </div>
                 </div>
                 @if (!empty($credit_log))
                     @foreach ($credit_log as $key => $credit)
-                        <div class="row form-row credit-log-entry" data-index="{{ $key }}">
-                            <div class="col-md-6">
+                        <div class="row form-row credit-log-entry" data-index="{{ $key }}" data-credit-log-user="{{ $credit['user_id'] ?? 'legacy' }}">
+                            <div class="col-md-4">
                                 <div class="form-group">
                                     <input type="number" name=""
                                             class="form-control remaining-credit-limit" 
@@ -876,12 +1034,18 @@
                                             placeholder="Enter Remaing credit limit">
                                 </div>
                             </div>
-                            <div class="col-md-5">
+                            <div class="col-md-4">
                                 <div class="form-group">
                                     <input type="datetime-local" 
                                             class="form-control remaining-credit-time" 
                                             readonly 
                                             value="{{ $credit['credit_time'] }}">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <input type="text" class="form-control" readonly
+                                            value="{{ $credit['user_name'] ?? ($creditLogUsers->get((string) ($credit['user_id'] ?? '')) ?? (($credit['user_id'] ?? null) ? 'User ' . $credit['user_id'] : 'Legacy / Unassigned')) }}">
                                 </div>
                             </div>
                             <div class="col-md-1">
@@ -1574,6 +1738,94 @@ $(document).ready(function () {
 
     });
 
+});
+</script>
+
+<script>
+$(function () {
+    const originalCreditValues = {
+        assigned: $('#adv_customer_credit_limit').val(),
+        remaining: $('#remaining_credit').val(),
+        invoice: $('#invoice_credit_limit').val(),
+        exhausted: $('#total_exhausted_limit').val(),
+        paymentReceived: $('#total_payment_received').val(),
+        total: $('#total_credit_limit').val(),
+        totalInvoice: $('#total_invoice_credit_limit').val(),
+        combined: $('#total_combined_credit_limit').val()
+    };
+
+    $('#credit_log_user_filter').on('change', function () {
+        const selectedUser = $(this).val();
+
+        $('[data-credit-log-user]').each(function () {
+            const rowUser = String($(this).attr('data-credit-log-user'));
+            $(this).toggle(selectedUser === 'all' || rowUser === selectedUser);
+        });
+
+        $('[data-history-user]').each(function () {
+            const rowUser = String($(this).attr('data-history-user'));
+            $(this).toggle(selectedUser === 'all' || rowUser === selectedUser);
+        });
+
+        if (selectedUser === 'all') {
+            $('#adv_customer_credit_limit').val(originalCreditValues.assigned);
+            $('#remaining_credit').val(originalCreditValues.remaining);
+            $('#remaining_credit_new').val(originalCreditValues.remaining);
+            $('#invoice_credit_limit').val(originalCreditValues.invoice);
+            $('#total_exhausted_limit').val(originalCreditValues.exhausted);
+            $('#total_payment_received').val(originalCreditValues.paymentReceived);
+            $('#total_credit_limit').val(originalCreditValues.total);
+            $('#total_invoice_credit_limit').val(originalCreditValues.totalInvoice);
+            $('#total_combined_credit_limit').val(originalCreditValues.combined);
+            return;
+        }
+
+        let assigned = 0;
+        let remaining = 0;
+        let invoice = 0;
+        let exhausted = 0;
+        let paymentReceived = 0;
+        let matchedCreditRows = 0;
+        $('[data-history-user][data-credit-type]').each(function () {
+            if (String($(this).attr('data-history-user')) !== selectedUser) {
+                return;
+            }
+
+            matchedCreditRows++;
+            const amount = parseFloat($(this).attr('data-credit-amount')) || 0;
+            const type = $(this).attr('data-credit-type');
+            if (type === 'Assigned Credit') assigned += amount;
+            if (type === 'Remaining Credit') remaining += amount;
+            if (type === 'Invoice Credit') invoice += amount;
+        });
+
+        if (matchedCreditRows === 0) {
+            assigned = parseFloat(originalCreditValues.total) || parseFloat(originalCreditValues.assigned) || 0;
+            remaining = parseFloat(originalCreditValues.remaining) || 0;
+            invoice = parseFloat(originalCreditValues.totalInvoice) || parseFloat(originalCreditValues.invoice) || 0;
+        }
+
+        $('[data-history-user][data-load-amount]').each(function () {
+            if (String($(this).attr('data-history-user')) !== selectedUser) {
+                return;
+            }
+
+            const loadAmount = parseFloat($(this).attr('data-load-amount')) || 0;
+            const receivedAmount = parseFloat($(this).attr('data-received-amount')) || 0;
+            exhausted += Math.max(0, loadAmount - receivedAmount);
+            paymentReceived += receivedAmount;
+        });
+
+        $('#adv_customer_credit_limit').val(assigned.toFixed(2));
+        $('#remaining_credit').val(remaining.toFixed(2));
+        $('#remaining_credit_new').val(remaining.toFixed(2));
+        $('#invoice_credit_limit').val(invoice.toFixed(2));
+        $('#total_exhausted_limit').val(exhausted.toFixed(2));
+        $('#total_payment_received').val(paymentReceived.toFixed(2));
+        $('#total_credit_limit').val(assigned.toFixed(2));
+        $('#total_invoice_credit_limit').val(invoice.toFixed(2));
+        $('#total_combined_credit_limit').val((assigned + invoice).toFixed(2));
+    });
 });
 </script>
 
