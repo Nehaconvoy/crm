@@ -162,6 +162,13 @@
                                 @error('EmergencyContact') <span class="text-danger">{{ $message }}</span> @enderror
                             </div>
 
+                            <div class="col-3 mb-4">
+                                <label class="form-label" for="ContactNumber">Contact Number</label>
+                                <input type="tel" id="ContactNumber" name="ContactNumber" class="form-control"
+                                    maxlength="30" value="{{ old('ContactNumber') }}">
+                                @error('ContactNumber') <span class="text-danger">{{ $message }}</span> @enderror
+                            </div>
+
                             <div class="col-12 text-center">
                                 <button type="submit" class="btn btn-primary">Create User</button>
                             </div>

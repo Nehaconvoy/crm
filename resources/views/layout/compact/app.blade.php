@@ -101,6 +101,10 @@ div#datatable-buttons_filter {
     margin-top: 1rem;
 }
 
+.dataTables_wrapper:has(+ .custom-pagination .pagination-summary) .dataTables_info {
+    display: none !important;
+}
+
 .custom-pagination .pagination {
     justify-content: center;
     flex-wrap: wrap;

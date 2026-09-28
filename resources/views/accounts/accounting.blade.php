@@ -152,6 +152,13 @@ table.dataTable tbody > tr.selected td p {
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
+                                <a class="nav-link {{ $activeTab === 'delivered' ? 'active' : '' }}" data-bs-toggle="tab" href="#delivered" role="tab"
+                                    aria-selected="false" tabindex="-1">
+                                    <span class="d-block d-sm-none"><i class="fas fa-truck"></i></span>
+                                    <span class="d-none d-sm-block">Delivered</span>
+                                </a>
+                            </li>
+                            <li class="nav-item" role="presentation">
                                 <a class="nav-link {{ $activeTab === 'completed' ? 'active' : '' }}" data-bs-toggle="tab" href="#completed" role="tab"
                                     aria-selected="false" tabindex="-1">
                                     <span class="d-block d-sm-none"><i class="far fa-user"></i></span>
@@ -224,6 +231,44 @@ table.dataTable tbody > tr.selected td p {
                                 </table>
                                 <div class="custom-pagination pagination-container">
                                     {!! render_pagination_links($open) !!}
+                                </div>
+                            </div>
+                            <div class="tab-pane {{ $activeTab === 'delivered' ? 'active show' : '' }}" id="delivered" role="tabpanel">
+                                <table id="datatable-buttons-delivered" class="table table-striped table-bordered dt-responsive nowrap accounts-table"
+                                    style="border-collapse: collapse; border-spacing: 0; width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Sr No.</th>
+                                            <th>Actions</th>
+                                            <th>Load #</th>
+                                            <th>Customer Name</th>
+                                            <th>Customer Final Rate</th>
+                                            <th>Internal Team Notes</th>
+                                            <th>Paper Work Date</th>
+                                            <th>Agent</th>
+                                            <th>W/O #</th>
+                                            <th>Load Creation Date</th>
+                                            <th>Shipper Date</th>
+                                            <th>Delivered Date</th>
+                                            <th>Actual Delivered Date</th>
+                                            <th>Carrier</th>
+                                            <th>Carrier MC no</th>
+                                            <th>Carrier Base Rate</th>
+                                            <th>Carrier FSC Rate</th>
+                                            <th>Carrier Other Rate</th>
+                                            <th>Carrier Final Charges</th>
+                                            <th>Pickup Location</th>
+                                            <th>unloading Location</th>
+                                            <th>Load Status</th>
+                                            <th>Aging</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="delivered-search">
+                                        @include('accounts.partials.accounting_complete', ['complete' => $delivered, 'showInvoiceAction' => false])
+                                    </tbody>
+                                </table>
+                                <div class="custom-pagination pagination-container">
+                                    {!! render_pagination_links($delivered) !!}
                                 </div>
                             </div>
                             <div class="tab-pane {{ $activeTab === 'completed' ? 'active show' : '' }}" id="completed" role="tabpanel">
@@ -412,6 +457,10 @@ table.dataTable tbody > tr.selected td p {
             resultContainer = '#open-search'; pageName = 'open';
             tableSelector = '#datatable-buttons-open';
 
+        } else if (activeTab === '#delivered') {
+            resultContainer = '#delivered-search'; pageName = 'delivered';
+            tableSelector = '#datatable-buttons-delivered';
+
         } else if (activeTab === '#completed') {
             resultContainer = '#completed-search'; pageName = 'complete';
             tableSelector = '#datatable-buttons-completed';
@@ -493,6 +542,13 @@ $(document).ready(function () {
             ajaxUrl = '/account/accounting_completed_search';
             resultContainer = '#completed-search';
             tableSelector = '#datatable-buttons-completed';
+
+        } else if (target === '#delivered') {
+            $('form.app-search-load .position-relative-load, form.app-search .position-relative').attr('id', 'delivereds');
+            inputSelector = '#delivereds input[name="query"]';
+            ajaxUrl = '/account/accounting_delivered_search';
+            resultContainer = '#delivered-search';
+            tableSelector = '#datatable-buttons-delivered';
 
         } else if (target === '#invoiced') {
             $('form.app-search-load .position-relative-load, form.app-search .position-relative').attr('id', 'invoiceds');
@@ -581,6 +637,7 @@ $(document).ready(function () {
 $(document).ready(function() {
     const tables = {
         '#open': { selector: '#datatable-buttons-open', initialized: false },
+        '#delivered': { selector: '#datatable-buttons-delivered', initialized: false },
         '#completed': { selector: '#datatable-buttons-completed', initialized: false },
         '#invoiced': { selector: '#datatable-buttons-invoiced', initialized: false },
         '#invoiced_paid': { selector: '#datatable-buttons-invoiced_paid', initialized: false },
@@ -631,6 +688,11 @@ $('input[name="loadquery"]').on('keyup', function () {
             ajaxUrl = '/account/load_search_by_load';
             resultContainer = '#completed-search';
             tableSelector = '#datatable-buttons-completed';
+
+        } else if (target === '#delivered') {
+            ajaxUrl = '/account/load_search_by_load';
+            resultContainer = '#delivered-search';
+            tableSelector = '#datatable-buttons-delivered';
 
         } else if (target === '#invoiced') {
             ajaxUrl = '/account/load_search_by_load';

@@ -68,8 +68,8 @@ class AccountController extends Controller
 						
 						return view('accounts.partials.accounting_open',compact('open'))->render();
 						
-					}else if($request->input('target') == '#completed'){
-						 $complete = Load::where('load_status', 'Completed')
+    					}else if($request->input('target') == '#completed'){
+                         $complete = Load::where('load_status', 'Completed')
 							->where(function ($query) {
 								$query->where('invoice_status', '')
 									->orWhereNull('invoice_status');
@@ -84,6 +84,26 @@ class AccountController extends Controller
 							->paginate(100)->setPageName('complete');
 							
 						return view('accounts.partials.accounting_complete',compact('complete'))->render();
+
+                    }else if($request->input('target') == '#delivered'){
+                         $complete = Load::where('load_status', 'Delivered')
+                            ->where(function ($query) {
+                                $query->where('invoice_status', '')
+                                    ->orWhereNull('invoice_status');
+                            })
+                            ->where(function($query) use ($searchTerms) {
+                                foreach ($searchTerms as $term) {
+                                    $query->orWhere('load_number', 'like', "%{$term}%");
+                                }
+                            })
+                            ->with(['user', 'customer', 'carrier', 'user.officedata'])
+                            ->orderBy('loads.id', 'desc')
+                            ->paginate(100)->setPageName('delivered');
+
+                        return view('accounts.partials.accounting_complete', [
+                            'complete' => $complete,
+                            'showInvoiceAction' => false,
+                        ])->render();
 						
 					}else if($request->input('target') == '#invoiced'){
 						$invoiced = Load::where('invoice_status', 'Paid')
@@ -123,6 +143,7 @@ class AccountController extends Controller
     public function accounting(Request $request)
     {
         $activeTab = match (true) {
+            $request->filled('delivered') => 'delivered',
             $request->filled('complete') => 'completed',
             $request->filled('invoiced') => 'invoiced',
             $request->filled('paid') => 'invoiced_paid',
@@ -146,6 +167,20 @@ class AccountController extends Controller
         }
 
         $open = $openQuery->paginate(50, ['*'], 'open');
+
+        $deliveredQuery = Load::where('load_status', 'Delivered')
+            ->where(function ($query) {
+                $query->where('invoice_status', '')
+                    ->orWhereNull('invoice_status');
+            })
+            ->with(['user', 'customer', 'carrier', 'user.officedata'])
+            ->orderBy('loads.id', 'desc');
+
+        if (!empty($numbersArray)) {
+            $deliveredQuery->whereIn('load_number', $numbersArray);
+        }
+
+        $delivered = $deliveredQuery->paginate(50, ['*'], 'delivered');
 
         // Completed tab query
         $completeQuery = Load::where('load_status', 'Completed')
@@ -188,13 +223,19 @@ class AccountController extends Controller
         if ($request->ajax()) {
             $tabConfig = [
                 '#open' => ['view' => 'accounts.partials.accounting_open', 'paginator' => $open],
+                '#delivered' => ['view' => 'accounts.partials.accounting_complete', 'paginator' => $delivered],
                 '#completed' => ['view' => 'accounts.partials.accounting_complete', 'paginator' => $complete],
                 '#invoiced' => ['view' => 'accounts.partials.accounting_invoiced', 'paginator' => $invoiced],
                 '#invoiced_paid' => ['view' => 'accounts.partials.accounting_paid', 'paginator' => $paid],
             ];
 
             $config = $tabConfig[$request->input('tab')] ?? $tabConfig['#open'];
-            $html = view($config['view'], compact('open', 'complete', 'invoiced', 'paid'))->render();
+            $viewData = compact('open', 'complete', 'invoiced', 'paid');
+            if ($request->input('tab') === '#delivered') {
+                $viewData['complete'] = $delivered;
+                $viewData['showInvoiceAction'] = false;
+            }
+            $html = view($config['view'], $viewData)->render();
 
             return response()->json([
                 'html' => $html,
@@ -202,7 +243,7 @@ class AccountController extends Controller
             ]);
         }
 
-        return view('accounts.accounting', compact('open', 'complete', 'invoiced', 'paid', 'activeTab'));
+        return view('accounts.accounting', compact('open', 'delivered', 'complete', 'invoiced', 'paid', 'activeTab'));
     }
 
 	
@@ -2420,7 +2461,7 @@ $searchTerms = array_filter(
 
             if (count($searchTerms) > 0) {
                 // Search for non-empty terms with 'orWhere'
-                $complete =Load::where('load_status','Completed')->with(['user','customer','carrier'])->where(function($query) {
+                $complete = Load::where('load_status', 'Completed')->with(['user','customer','carrier'])->where(function($query) {
                     $query->where('invoice_status', '')
                           ->orWhereNull('invoice_status');
                     })->where(function($query) use ($searchTerms) {
@@ -2442,13 +2483,50 @@ $searchTerms = array_filter(
             }
         } else {
             // If query is empty, return a paginated result without any filter
-              $complete = Load::where('load_status','Completed')->with(['user','customer','carrier'])->where(function($query) {
+              $complete = Load::where('load_status', 'Completed')->with(['user','customer','carrier'])->where(function($query) {
                     $query->where('invoice_status', '')
                           ->orWhereNull('invoice_status');
                 })->orderBy("loads.id", "desc")->paginate(100);
         }
         
         return view('accounts.partials.accounting_complete', compact('complete'))->render();
+    }
+
+    public function accounting_delivered_search(Request $request)
+    {
+        $query = Load::where('load_status', 'Delivered')
+            ->where(function ($query) {
+                $query->where('invoice_status', '')
+                    ->orWhereNull('invoice_status');
+            })
+            ->with(['user', 'customer', 'carrier', 'user.officedata'])
+            ->orderBy('loads.id', 'desc');
+
+        $searchTerms = array_filter(
+            preg_split('/[\\s,]+/', (string) $request->input('query', '')),
+            fn ($term) => !empty(trim($term))
+        );
+
+        if ($searchTerms) {
+            $query->where(function ($query) use ($searchTerms) {
+                foreach ($searchTerms as $term) {
+                    $query->orWhere('load_number', 'like', "%{$term}%")
+                        ->orWhere('load_workorder', 'like', "%{$term}%")
+                        ->orWhere('customer_refrence_number', 'like', "%{$term}%")
+                        ->orWhere('load_bill_to', 'like', "%{$term}%")
+                        ->orWhere('invoice_number', 'like', "%{$term}%");
+                }
+            });
+
+            $complete = $query->get();
+        } else {
+            $complete = $query->paginate(100, ['*'], 'delivered');
+        }
+
+        return view('accounts.partials.accounting_complete', [
+            'complete' => $complete,
+            'showInvoiceAction' => false,
+        ])->render();
     }
 
     public function accounting_invoiced_search(Request $request){

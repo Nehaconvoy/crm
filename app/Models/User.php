@@ -28,6 +28,7 @@ class User extends Authenticatable
         'manager',
         'team_lead',
         'office',
+        'contact_number',
         'status',
         
     ];

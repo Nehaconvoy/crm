@@ -521,6 +521,7 @@ class AdminController extends Controller
             //'modalleaderName' => 'required|exists:users,id',
             'Role' => 'required|exists:roles,id',
             'EmergencyContact' => 'required|string|max:15',
+            'ContactNumber' => 'nullable|string|max:30',
         ]);
     
         if ($validator->fails()) {
@@ -539,6 +540,7 @@ class AdminController extends Controller
         $user->team_lead = $request->modalleaderName;
         $user->role_id = $request->Role;
         $user->emergency_contact = $request->EmergencyContact;
+        $user->contact_number = $request->ContactNumber;
         $user->save();
 
         $subject = "Create the User, userid:-".$user->id;

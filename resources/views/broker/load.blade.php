@@ -1420,7 +1420,9 @@ div#datatable-buttons-open_filter,div#datatable-buttons-delivered_filter,div#dat
                 fixedHeader: true,
                 dom: 'Bfrtip',
                 search: false,
-                 pageLength: 50, 
+                info: false,
+                paging: false,
+                pageLength: 50,
 				        stateSave: true,   // ✅ remembers column visibility, page, search, etc.
         buttons: [
             {
@@ -2791,6 +2793,8 @@ $(document).ready(function() {
                 dom: 'Bfrtip',
                 search: false,
 				order: [[0, 'desc']],
+                info: false,
+                paging: false,
                 pageLength: 50,
                 fixedHeader: true,
                         stateSave: true,   // ✅ remembers column visibility, page, search, etc.
@@ -2812,6 +2816,8 @@ $(document).ready(function() {
             dom: 'Bfrtip',
 			search: false,
 			order: [[0, 'desc']],
+            info: false,
+            paging: false,
             pageLength: 50,
             fixedHeader: true,
                     stateSave: true,   // ✅ remembers column visibility, page, search, etc.
@@ -2891,6 +2897,8 @@ $(document).ready(function() {
                     dom: 'Bfrtip',
                     search: false,
                     order: [[0, 'desc']],
+                    info: false,
+                    paging: false,
                     pageLength: 50,
                     fixedHeader: true,
                            stateSave: true,   // ✅ remembers column visibility, page, search, etc.

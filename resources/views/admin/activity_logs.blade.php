@@ -59,7 +59,9 @@
 												@endforeach
                                             </tbody>
                                         </table>
-																{{ $alllogs->links() }}
+                                        <div class="custom-pagination">
+                                            {!! render_pagination_links($alllogs) !!}
+                                        </div>
                                     </div>
                                 </div>
                             </div> <!-- end col -->

@@ -669,6 +669,7 @@
             responsive: true,
             dom: 'rtip',
             buttons: ['copy', 'excel', 'pdf', 'colvis'],
+            info: false,
             paging: false,
         });
     },
@@ -796,6 +797,7 @@ $(document).on('click', '.custom-pagination a', function (e) {
                 responsive: true,
                 dom: 'rtip',
                 buttons: ['copy', 'excel', 'pdf', 'colvis'],
+                info: false,
                 paging: false,
                 pageLength: 50,
             });
@@ -873,6 +875,7 @@ $(document).on('click', '.custom-pagination a', function (e) {
                         dom: 'Bfrtip',
                         buttons: ['copy', 'excel', 'pdf', 'colvis'],
                         pageLength: 50,
+                        info: false,
                         searching: false,
                         paging: false
                     });
@@ -981,6 +984,8 @@ $(document).on('click', '.custom-pagination a', function (e) {
                                     'colvis'
                                 ],
                                 pageLength: 50,
+                                info: query.length > 0,
+                                paging: query.length > 0,
                             });
 
                             $('.loader-container').addClass('hide');
@@ -1051,6 +1056,7 @@ $(document).on('click', '.custom-pagination a', function (e) {
                     dom: 'frtip',
                     buttons: ['copy', 'excel', 'pdf', 'colvis'],
                     pageLength: 50,
+                    info: false,
                     paging: false,
                 });
                 tables[target].initialized = true;
@@ -1065,6 +1071,7 @@ $(document).on('click', '.custom-pagination a', function (e) {
                 buttons: ['copy', 'excel', 'pdf', 'colvis'],
                 pageLength: 50, // ✅ default show 50
                 lengthMenu: [10, 25, 50, 100], // ✅ dropdown options
+                info: false,
                 paging: false,
             });
             tables[activeTab].initialized = true;

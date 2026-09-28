@@ -343,6 +343,7 @@
                     responsive: true,
                     dom: 'rtip',
                     buttons: ['copy', 'excel', 'pdf', 'colvis'],
+                    info: false,
                     paging: false,
                     pageLength: 100,
 
@@ -416,6 +417,7 @@
                         dom: 'Bfrtip',
                         buttons: ['copy', 'excel', 'pdf', 'colvis'],
                         searching: false,
+                        info: false,
                         paging: false,
                         pageLength: 100,
                     });
@@ -575,6 +577,8 @@
                     dom: 'Bfrtip',
                     buttons: ['copy', 'excel', 'pdf', 'colvis'],
                     pageLength: 100,
+                    info: false,
+                    paging: false,
                 });
                 tables[target].initialized = true;
             }
@@ -587,6 +591,8 @@
                 dom: 'Bfrtip',
                 buttons: ['copy', 'excel', 'pdf', 'colvis'],
                 pageLength: 100,
+                info: false,
+                paging: false,
             });
             tables[activeTab].initialized = true;
         }

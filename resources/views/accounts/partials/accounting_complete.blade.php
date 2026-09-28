@@ -54,8 +54,8 @@
 
                     <a href="{{route('CompletedPublicDoc',$completes->id)}}" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer"> <i class="fas fa-file"></i></a> 
                 
-                    @if($completes->load_status == 'Delivered' || $completes->invoice_status == 'Completed')
-                        <a href="{{ route('accounts.invoice.show', $completes->id) }}" class="btn btn-success btn-sm">Invoice</a>
+                    @if(($showInvoiceAction ?? true) && ($completes->load_status == 'Delivered' || $completes->invoice_status == 'Completed'))
+                        <a href="{{ route('print.invoice', $completes->id) }}" class="btn btn-success btn-sm">Invoice</a>
                     @endif
                     <a href="{{ route('accounts.view_loads_detail', $completes->id) }}" class="btn btn-primary btn-sm" title="logs"> <i class="fas fa-eye"></i></a>
                 </td>
